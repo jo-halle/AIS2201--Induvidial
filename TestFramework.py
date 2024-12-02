@@ -1,15 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import butter, lfilter, spectrogram
+from scipy.signal import spectrogram
 from scipy.io import wavfile
 
-# Test Signal Generators
+# Function to load WAV files
+def loadWavFile(filePath):
+    fs, data = wavfile.read(filePath)
+    data = data / (2**15) if data.dtype == 'int16' else data
+    return fs, data
+
+# Function to generate a sine wave with noise
 def sineWithNoise(freq, fs, duration, noiseLevel):
     t = np.linspace(0, duration, int(fs * duration), endpoint=False)
     sineWave = np.sin(2 * np.pi * freq * t)
     noise = noiseLevel * np.random.normal(size=t.shape)
     return t, sineWave + noise
 
+# Function to generate a sine wave with abrupt frequency change
 def abruptFreqChange(freq1, freq2, fs, duration):
     t = np.linspace(0, duration, int(fs * duration), endpoint=False)
     half = len(t) // 2
@@ -17,44 +24,18 @@ def abruptFreqChange(freq1, freq2, fs, duration):
     wave = np.concatenate([wave, np.sin(2 * np.pi * freq2 * t[half:])])
     return t, wave
 
-def loadWavFile(filePath):
-    fs, data = wavfile.read(filePath)
-    data = data / (2**15) if data.dtype == 'int16' else data
-    return fs, data
-
-# Frequency Detection Functions
+# Baseline frequency detection using N-point DFT
 def baselineFrequencyDetection(signal, fs, N):
     dft = np.fft.fft(signal[:N])
     freqs = np.fft.fftfreq(N, 1 / fs)
-    return abs(freqs[np.argmax(np.abs(dft))])
+    dominantFreq = freqs[np.argmax(np.abs(dft))]
+    return abs(dominantFreq)
 
-def calculateError(detectedFreq, trueFreq):
-    return np.abs(detectedFreq - trueFreq) / trueFreq * 100
+# Function to evaluate detection accuracy
+def evaluateAccuracy(detectedFreq, trueFreq):
+    return np.abs(detectedFreq - trueFreq) / trueFreq * 100  # Percent error
 
-# Filtering
-def bandPassFilter(signal, fs, lowCutoff, highCutoff):
-    nyquist = 0.5 * fs
-    low = lowCutoff / nyquist
-    high = highCutoff / nyquist
-    b, a = butter(5, [low, high], btype='band')
-    return lfilter(b, a, signal)
-
-# Sliding DFT
-def slidingDFT(signal, fs, windowSize, stepSize):
-    freqs = []
-    for i in range(0, len(signal) - windowSize, stepSize):
-        freqs.append(baselineFrequencyDetection(signal[i:i + windowSize], fs, windowSize))
-    return freqs
-
-# Visualization
-def plotSignal(time, signal, title):
-    plt.figure()
-    plt.plot(time, signal)
-    plt.title(title)
-    plt.xlabel("Time [s]")
-    plt.ylabel("Amplitude")
-    plt.show()
-
+# Spectrogram plot function
 def plotSpectrogram(signal, fs, title):
     f, t, Sxx = spectrogram(signal, fs)
     plt.figure()
@@ -65,43 +46,58 @@ def plotSpectrogram(signal, fs, title):
     plt.colorbar(label="Power [dB]")
     plt.show()
 
-def plotSlidingDFT(timeStamps, frequencies, title):
+# Magnitude spectrum plot function
+def plotMagnitudeSpectrum(signal, fs, title):
+    N = len(signal)
+    dft = np.fft.fft(signal)
+    freqs = np.fft.fftfreq(N, 1/fs)
+    
+    # Take only the positive half of the spectrum
+    positive_freqs = freqs[:N // 2]
+    positive_magnitude = np.abs(dft[:N // 2])
+    
     plt.figure()
-    plt.plot(timeStamps, frequencies, marker='o')
-    plt.title(title)
-    plt.xlabel("Time [s]")
-    plt.ylabel("Frequency [Hz]")
+    plt.plot(positive_freqs, positive_magnitude)
+    plt.title(f"Magnitude Spectrum - {title}")
+    plt.xlabel("Frequency [Hz]")
+    plt.ylabel("Magnitude")
+    plt.grid()
     plt.show()
 
-# Test Framework
-fs = 8000  # Sampling frequency
-duration = 2  # Signal duration in seconds
-N = 1024  # DFT size
+# Main Test Framework for Part 1
+if __name__ == "__main__":
+    # Sampling frequency and duration
+    fs = 8000  # Sampling frequency
+    duration = 2  # 2 seconds
+    N = 1024  # DFT size
 
-# 1. Sine Wave with Noise
-t, noisySine = sineWithNoise(440, fs, duration, 0.1)
-detectedFreqNoisy = baselineFrequencyDetection(noisySine, fs, N)
-errorNoisy = calculateError(detectedFreqNoisy, 440)
-print(f"Noisy Sine Wave - Detected Frequency: {detectedFreqNoisy} Hz, Error: {errorNoisy:.2f}%")
-plotSignal(t, noisySine, "Sine Wave with Noise")
+    # Test 1: Pure sine wave with noise
+    t, noisySine = sineWithNoise(freq=440, fs=fs, duration=duration, noiseLevel=0.1)
+    detectedFreq = baselineFrequencyDetection(noisySine, fs, N)
+    error = evaluateAccuracy(detectedFreq, 440)
+    print(f"Noisy Sine Wave - Detected Frequency: {detectedFreq:.2f} Hz, Error: {error:.2f}%")
+    plotSpectrogram(noisySine, fs, "Sine Wave with Noise")
+    plotMagnitudeSpectrum(noisySine, fs, "Sine Wave with Noise")
 
-# 2. Abrupt Frequency Change
-t, abruptChange = abruptFreqChange(440, 880, fs, duration)
-detectedFreqsAbrupt = slidingDFT(abruptChange, fs, windowSize=1024, stepSize=512)
-print(f"Abrupt Change Signal - Detected Frequencies: {detectedFreqsAbrupt}")
-plotSlidingDFT(np.arange(len(detectedFreqsAbrupt)) * 512 / fs, detectedFreqsAbrupt, "Sliding DFT for Abrupt Frequency Change")
+    # Test 2: Sine wave with abrupt frequency change
+    t, abruptChangeSignal = abruptFreqChange(freq1=440, freq2=880, fs=fs, duration=duration)
+    detectedFreqAbrupt = baselineFrequencyDetection(abruptChangeSignal, fs, N)
+    print(f"Abrupt Change Signal - Detected Frequency: {detectedFreqAbrupt:.2f} Hz")
+    plotSpectrogram(abruptChangeSignal, fs, "Abrupt Frequency Change Signal")
+    plotMagnitudeSpectrum(abruptChangeSignal, fs, "Abrupt Frequency Change Signal")
 
-# 3. Musical Signal
-musicalFile = "./SampleAudio/B_oboe.wav"  # Replace with the path to your musical WAV file
-fsMusical, musicalSignal = loadWavFile(musicalFile)
-filteredMusicalSignal = bandPassFilter(musicalSignal, fsMusical, 400, 500)
-detectedFreqMusical = baselineFrequencyDetection(filteredMusicalSignal, fsMusical, N)
-print(f"Musical Signal - Detected Frequency: {detectedFreqMusical} Hz")
-plotSpectrogram(filteredMusicalSignal, fsMusical, "Filtered Musical Signal")
+    # Test 3: Musical instrument signal from WAV file
+    musicalFilePath = "./SampleAudio/B_oboe.wav"
+    fsMusical, musicalSignal = loadWavFile(musicalFilePath)
+    detectedFreqMusical = baselineFrequencyDetection(musicalSignal, fsMusical, N)
+    print(f"Musical Signal - Detected Frequency: {detectedFreqMusical:.2f} Hz")
+    plotSpectrogram(musicalSignal, fsMusical, "Musical Signal")
+    plotMagnitudeSpectrum(musicalSignal, fsMusical, "Musical Signal")
 
-# 4. Vocal Signal
-vocalFile = "./SampleAudio/Zauberflöte_vocal.wav"  # Replace with the path to your vocal WAV file
-fsVocal, vocalSignal = loadWavFile(vocalFile)
-slidingFreqsVocal = slidingDFT(vocalSignal, fsVocal, windowSize=1024, stepSize=512)
-print(f"Vocal Signal - Detected Frequencies: {slidingFreqsVocal}")
-plotSlidingDFT(np.arange(len(slidingFreqsVocal)) * 512 / fsVocal, slidingFreqsVocal, "Sliding DFT for Vocal Signal")
+    # Test 4: Vocal-like signal from WAV file
+    vocalFilePath = "./SampleAudio/Zauberflöte_vocal.wav"
+    fsVocal, vocalSignal = loadWavFile(vocalFilePath)
+    detectedFreqVocal = baselineFrequencyDetection(vocalSignal, fsVocal, N)
+    print(f"Vocal Signal - Detected Frequency: {detectedFreqVocal:.2f} Hz")
+    plotSpectrogram(vocalSignal, fsVocal, "Vocal-Like Signal")
+    plotMagnitudeSpectrum(vocalSignal, fsVocal, "Vocal-Like Signal")
