@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import spectrogram, butter, lfilter
+from scipy.signal import butter, lfilter
 from scipy.io import wavfile
 
 # Helper Functions
@@ -94,7 +94,6 @@ if __name__ == "__main__":
     # Test 2: Abrupt Frequency Change
     t, abruptChangeSignal = abruptFreqChange(440, 880, fs, duration)
     sliding_freqs = slidingDFT(abruptChangeSignal, fs, N, step)
-    # print(f"Sliding DFT Detected Frequencies: {sliding_freqs}")
     plt.figure()
     plt.plot(np.arange(len(sliding_freqs)) * step / fs, sliding_freqs, marker='o')
     plt.title("Sliding DFT for Abrupt Frequency Change")
