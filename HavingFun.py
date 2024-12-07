@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.io import wavfile
 from scipy.signal import resample_poly
 from baseline_algorithm import freq_detection
+from FreqDetection import freqDetectionZeroPad, FreqDetectionWindowed, FreqDetectionHps
 
 ###############################################
 # Parameters for All Tests
@@ -230,6 +231,9 @@ def TestRealWorldNoise(AudioFile='./SampleAudio/A4_oboe.wav'):
     plt.tight_layout()
     plt.show()
 
+###############################################
+# Test 4: Vocal Audio with Noise
+###############################################
 def TestVocalNoise(AudioFile='SampleAudio/Zauberflöte_vocal.wav',
                    TargetFs=16000, Duration=2.2, TrueFrequency=440, NDFT=2048):
     """
@@ -323,4 +327,7 @@ if __name__ == "__main__":
     # Test 3: Real-world Audio with Noise
     TestRealWorldNoise('./SampleAudio/A4_oboe.wav')
 
+    # Test 4: Vocal Audio with Noise
     TestVocalNoise()
+
+    
