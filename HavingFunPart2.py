@@ -3,18 +3,16 @@ import matplotlib.pyplot as plt
 from scipy.io import wavfile
 from scipy.signal import resample_poly
 from baseline_algorithm import freq_detection
-
-# Import improved frequency detection methods
 from FreqDetection import freqDetectionZeroPad, FreqDetectionWindowed, FreqDetectionHps
 
 ###############################################
-# Parameters for All Tests
+# Parameters
 ###############################################
-Fs = 10_000   # Sampling Frequency for Synthetic Tests
-NDFT = 1024   # Default DFT Size for Baseline Tests
+Fs = 10_000   # Sampling frequency for synthetic tests
+NDFT = 1024   # Default DFT size
 
 ###############################################
-# Helper Function: Generate Frequency Step Signal
+# Helper Functions
 ###############################################
 def generate_freq_step_signal(Fs, TTotal=2.0, F1=440, F2=880, Amplitude=1, NoiseVar=0.5):
     NTotal = int(TTotal * Fs)
@@ -31,907 +29,520 @@ def generate_freq_step_signal(Fs, TTotal=2.0, F1=440, F2=880, Amplitude=1, Noise
     TrueFreqs = np.where(TimeN < TimeChange, F1, F2)
     return TimeN, XN, TrueFreqs
 
-###############################################
-# Test 1: Frequency Step Response (Baseline)
-###############################################
-def TestFrequencyStep():
-    TimeN, XN, TrueFreqs = generate_freq_step_signal(Fs)
-    NValues = [1024, 2048]
-
-    plt.figure(figsize=(10, 5))
-    plt.plot(TimeN, TrueFreqs, label='True Frequency', color='blue')
-    
-    for NValue in NValues:
-        Timestamps, Freqs = freq_detection(XN, Fs, N=NValue)
-        plt.plot(Timestamps, Freqs, label=f'Baseline (N={NValue})')
-    
-    plt.title("Test 1: Frequency Step Response (Baseline)")
-    plt.xlabel('Time (s)')
-    plt.ylabel('Frequency (Hz)')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-###############################################
-# Test 1 Variations with Improved Methods
-###############################################
-def TestFrequencyStep_ZeroPad():
-    TimeN, XN, TrueFreqs = generate_freq_step_signal(Fs)
-    plt.figure(figsize=(10, 5))
-    plt.plot(TimeN, TrueFreqs, label='True Frequency', color='blue')
-    
-    # Zero-padding approach
-    Timestamps, Freqs = freqDetectionZeroPad(XN, Fs, N=1024, padFactor=4)
-    plt.plot(Timestamps, Freqs, label='Zero-Pad')
-    
-    plt.title("Test 1: Frequency Step Response (Zero-Pad)")
-    plt.xlabel('Time (s)')
-    plt.ylabel('Frequency (Hz)')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def TestFrequencyStep_Windowed():
-    TimeN, XN, TrueFreqs = generate_freq_step_signal(Fs)
-    plt.figure(figsize=(10, 5))
-    plt.plot(TimeN, TrueFreqs, label='True Frequency', color='blue')
-    
-    # Windowed approach
-    Timestamps, Freqs = FreqDetectionWindowed(XN, Fs, N=1024)
-    plt.plot(Timestamps, Freqs, label='Windowed')
-    
-    plt.title("Test 1: Frequency Step Response (Windowed)")
-    plt.xlabel('Time (s)')
-    plt.ylabel('Frequency (Hz)')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def TestFrequencyStep_Hps():
-    TimeN, XN, TrueFreqs = generate_freq_step_signal(Fs)
-    plt.figure(figsize=(10, 5))
-    plt.plot(TimeN, TrueFreqs, label='True Frequency', color='blue')
-    
-    # HPS approach
-    Timestamps, Freqs = FreqDetectionHps(XN, Fs, N=1024, harmonics=3)
-    plt.plot(Timestamps, Freqs, label='HPS')
-    
-    plt.title("Test 1: Frequency Step Response (HPS)")
-    plt.xlabel('Time (s)')
-    plt.ylabel('Frequency (Hz)')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-###############################################
-# Test 2: Pure Sine with Noise (Baseline)
-###############################################
-def TestPureSineNoise():
-    Duration = 4.0
+def generate_pure_sine_noise(Fs, Duration=4.0, Frequency=885, Amplitude=1.0):
     N = int(Duration * Fs)
-    Frequency = 885
-    Amplitude = 1.0
     TimeN = np.arange(N) / Fs
     CleanSignal = Amplitude * np.sin(2 * np.pi * Frequency * TimeN)
+    return TimeN, CleanSignal, Frequency, Amplitude
 
-    SNRValues = np.logspace(-2, 2, 20)
-    NoiseVars = (Amplitude**2 / (2 * SNRValues))
-
-    AvgEstimates = []
-    AvgErrors = []
-    ErrorBars = []
-
-    for NoiseVar in NoiseVars:
-        Noise = np.random.normal(0, np.sqrt(NoiseVar), N)
-        XN = CleanSignal + Noise
-        Timestamps, Freqs = freq_detection(XN, Fs, N=NDFT)
-        Freqs = np.array(Freqs)
-
-        AvgFreqEstimate = np.mean(Freqs)
-        AvgEstimates.append(AvgFreqEstimate)
-
-        Errors = np.abs(Freqs - Frequency)
-        AvgError = np.mean(Errors)
-        AvgErrors.append(AvgError)
-
-        ErrorBars.append(np.std(Errors))
-
-    InvSNR = 1 / SNRValues
-    plt.figure(figsize=(10, 8))
-
-    plt.subplot(2, 1, 1)
-    plt.plot(InvSNR, AvgEstimates, label='Baseline Avg. Freq. Estimate', color='red')
-    plt.fill_between(InvSNR, 
-                     np.array(AvgEstimates) - np.array(ErrorBars), 
-                     np.array(AvgEstimates) + np.array(ErrorBars), 
-                     color='red', alpha=0.2)
-    plt.axhline(Frequency, color='black', linestyle='--', label=f'True Frequency = {Frequency} Hz')
-    plt.xscale('log')
-    plt.xlabel('1/SNR')
-    plt.ylabel('Frequency Estimate (Hz)')
-    plt.title("Test 2: Pure Sine with Noise - Baseline Frequency Estimates")
-    plt.legend()
-    plt.grid(True)
-
-    plt.subplot(2, 1, 2)
-    plt.plot(InvSNR, AvgErrors, label='Baseline Avg. Error', color='blue')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel('1/SNR')
-    plt.ylabel('Error |f - f_hat| (Hz)')
-    plt.title("Test 2: Pure Sine with Noise - Baseline Estimation Error")
-    plt.legend()
-    plt.grid(True)
-
-    plt.tight_layout()
-    plt.show()
-
-###############################################
-# Test 2 Variations with Improved Methods
-###############################################
-def TestPureSineNoise_ZeroPad():
-    Duration = 4.0
-    N = int(Duration * Fs)
-    Frequency = 885
-    Amplitude = 1.0
-    TimeN = np.arange(N) / Fs
-    CleanSignal = Amplitude * np.sin(2 * np.pi * Frequency * TimeN)
-
-    SNRValues = np.logspace(-2, 2, 20)
-    NoiseVars = (Amplitude**2 / (2 * SNRValues))
-
-    AvgEstimates = []
-    AvgErrors = []
-    ErrorBars = []
-
-    for NoiseVar in NoiseVars:
-        Noise = np.random.normal(0, np.sqrt(NoiseVar), N)
-        XN = CleanSignal + Noise
-        Timestamps, Freqs = freqDetectionZeroPad(XN, Fs, N=NDFT, padFactor=4)
-        Freqs = np.array(Freqs)
-
-        AvgFreqEstimate = np.mean(Freqs)
-        AvgEstimates.append(AvgFreqEstimate)
-
-        Errors = np.abs(Freqs - Frequency)
-        AvgError = np.mean(Errors)
-        AvgErrors.append(AvgError)
-        ErrorBars.append(np.std(Errors))
-
-    InvSNR = 1 / SNRValues
-    plt.figure(figsize=(10, 8))
-
-    plt.subplot(2, 1, 1)
-    plt.plot(InvSNR, AvgEstimates, label='Zero-Pad Avg. Freq. Estimate', color='green')
-    plt.fill_between(InvSNR, 
-                     np.array(AvgEstimates) - np.array(ErrorBars), 
-                     np.array(AvgEstimates) + np.array(ErrorBars), 
-                     color='green', alpha=0.2)
-    plt.axhline(Frequency, color='black', linestyle='--', label=f'True Frequency = {Frequency} Hz')
-    plt.xscale('log')
-    plt.xlabel('1/SNR')
-    plt.ylabel('Frequency Estimate (Hz)')
-    plt.title("Test 2: Pure Sine with Noise - Zero-Pad Frequency Estimates")
-    plt.legend()
-    plt.grid(True)
-
-    plt.subplot(2, 1, 2)
-    plt.plot(InvSNR, AvgErrors, label='Zero-Pad Avg. Error', color='blue')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel('1/SNR')
-    plt.ylabel('Error |f - f_hat| (Hz)')
-    plt.title("Test 2: Pure Sine with Noise - Zero-Pad Estimation Error")
-    plt.legend()
-    plt.grid(True)
-
-    plt.tight_layout()
-    plt.show()
-
-def TestPureSineNoise_Windowed():
-    # Similar to TestPureSineNoise_ZeroPad, but calling FreqDetectionWindowed
-    # and updating labels accordingly.
-    Duration = 4.0
-    N = int(Duration * Fs)
-    Frequency = 885
-    Amplitude = 1.0
-    TimeN = np.arange(N) / Fs
-    CleanSignal = Amplitude * np.sin(2 * np.pi * Frequency * TimeN)
-
-    SNRValues = np.logspace(-2, 2, 20)
-    NoiseVars = (Amplitude**2 / (2 * SNRValues))
-
-    AvgEstimates = []
-    AvgErrors = []
-    ErrorBars = []
-
-    for NoiseVar in NoiseVars:
-        Noise = np.random.normal(0, np.sqrt(NoiseVar), N)
-        XN = CleanSignal + Noise
-        Timestamps, Freqs = FreqDetectionWindowed(XN, Fs, N=NDFT)
-        Freqs = np.array(Freqs)
-
-        AvgFreqEstimate = np.mean(Freqs)
-        AvgEstimates.append(AvgFreqEstimate)
-
-        Errors = np.abs(Freqs - Frequency)
-        AvgError = np.mean(Errors)
-        AvgErrors.append(AvgError)
-        ErrorBars.append(np.std(Errors))
-
-    InvSNR = 1 / SNRValues
-    plt.figure(figsize=(10, 8))
-
-    plt.subplot(2, 1, 1)
-    plt.plot(InvSNR, AvgEstimates, label='Windowed Avg. Freq. Estimate', color='purple')
-    plt.fill_between(InvSNR, 
-                     np.array(AvgEstimates) - np.array(ErrorBars), 
-                     np.array(AvgEstimates) + np.array(ErrorBars), 
-                     color='purple', alpha=0.2)
-    plt.axhline(Frequency, color='black', linestyle='--', label=f'True Frequency = {Frequency} Hz')
-    plt.xscale('log')
-    plt.xlabel('1/SNR')
-    plt.ylabel('Frequency Estimate (Hz)')
-    plt.title("Test 2: Pure Sine with Noise - Windowed Frequency Estimates")
-    plt.legend()
-    plt.grid(True)
-
-    plt.subplot(2, 1, 2)
-    plt.plot(InvSNR, AvgErrors, label='Windowed Avg. Error', color='blue')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel('1/SNR')
-    plt.ylabel('Error |f - f_hat| (Hz)')
-    plt.title("Test 2: Pure Sine with Noise - Windowed Estimation Error")
-    plt.legend()
-    plt.grid(True)
-
-    plt.tight_layout()
-    plt.show()
-
-def TestPureSineNoise_Hps():
-    # Similar to TestPureSineNoise_ZeroPad, but calling FreqDetectionHps
-    Duration = 4.0
-    N = int(Duration * Fs)
-    Frequency = 885
-    Amplitude = 1.0
-    TimeN = np.arange(N) / Fs
-    CleanSignal = Amplitude * np.sin(2 * np.pi * Frequency * TimeN)
-
-    SNRValues = np.logspace(-2, 2, 20)
-    NoiseVars = (Amplitude**2 / (2 * SNRValues))
-
-    AvgEstimates = []
-    AvgErrors = []
-    ErrorBars = []
-
-    for NoiseVar in NoiseVars:
-        Noise = np.random.normal(0, np.sqrt(NoiseVar), N)
-        XN = CleanSignal + Noise
-        Timestamps, Freqs = FreqDetectionHps(XN, Fs, N=NDFT, harmonics=3)
-        Freqs = np.array(Freqs)
-
-        AvgFreqEstimate = np.mean(Freqs)
-        AvgEstimates.append(AvgFreqEstimate)
-
-        Errors = np.abs(Freqs - Frequency)
-        AvgError = np.mean(Errors)
-        AvgErrors.append(AvgError)
-        ErrorBars.append(np.std(Errors))
-
-    InvSNR = 1 / SNRValues
-    plt.figure(figsize=(10, 8))
-
-    plt.subplot(2, 1, 1)
-    plt.plot(InvSNR, AvgEstimates, label='HPS Avg. Freq. Estimate', color='orange')
-    plt.fill_between(InvSNR, 
-                     np.array(AvgEstimates) - np.array(ErrorBars), 
-                     np.array(AvgEstimates) + np.array(ErrorBars), 
-                     color='orange', alpha=0.2)
-    plt.axhline(Frequency, color='black', linestyle='--', label=f'True Frequency = {Frequency} Hz')
-    plt.xscale('log')
-    plt.xlabel('1/SNR')
-    plt.ylabel('Frequency Estimate (Hz)')
-    plt.title("Test 2: Pure Sine with Noise - HPS Frequency Estimates")
-    plt.legend()
-    plt.grid(True)
-
-    plt.subplot(2, 1, 2)
-    plt.plot(InvSNR, AvgErrors, label='HPS Avg. Error', color='blue')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel('1/SNR')
-    plt.ylabel('Error |f - f_hat| (Hz)')
-    plt.title("Test 2: Pure Sine with Noise - HPS Estimation Error")
-    plt.legend()
-    plt.grid(True)
-
-    plt.tight_layout()
-    plt.show()
-
-###############################################
-# Test 3 Variations: Real-world Audio with Noise
-###############################################
-
-def TestRealWorldNoise(AudioFile='./SampleAudio/A4_oboe.wav'):
-    """
-    Load a real-world audio file (such as a musical instrument note),
-    resample to a chosen Fs, and add varying noise levels to assess how
-    the algorithm performs on complex waveforms under noise.
-    """
-    # Desired Parameters
-    TargetFs = 16_000   # Choose a Suitable Sampling Rate for Analysis
-    Duration = 2.2
-    N = int(Duration * TargetFs)
-    TrueFrequency = 440 # Expected Fundamental Frequency for A4
-    
-    # Load and Preprocess Audio
+def load_and_prepare_audio(AudioFile, TargetFs=16000, Duration=2.2, TrueFrequency=440):
     OrigFs, AudioData = wavfile.read(AudioFile)
     AudioData = AudioData.astype(np.float32) / np.max(np.abs(AudioData))  # Normalize
-    
-    # Resample if Needed
+    N = int(Duration * TargetFs)
+
     if OrigFs != TargetFs:
         AudioData = resample_poly(AudioData, TargetFs, OrigFs)
-    
-    # Ensure We Have N Samples (Pad or Truncate)
+
     if len(AudioData) < N:
         AudioData = np.pad(AudioData, (0, N - len(AudioData)), 'constant')
     else:
         AudioData = AudioData[:N]
-        
-    # Calculate Signal Power
+
     SignalPower = np.mean(AudioData**2)
-    
-    # Define Noise Powers and Arrays to Store Results
-    NoisePowers = np.logspace(-2, 2, 20)
-    AvgEstimates = []
-    AvgErrors = []
-    Variances = []
-    SNRValues = []
-    
-    for NoisePower in NoisePowers:
-        Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
-        NoisySignal = AudioData + Noise
-        
-        # Frequency Detection
-        _, Freqs = freq_detection(NoisySignal, TargetFs, N=2048)
-        Freqs = np.clip(Freqs, 0, TargetFs/2)
-        
-        AvgFreqEstimate = np.mean(Freqs)
-        Var = np.var(Freqs)
-        Error = np.abs(AvgFreqEstimate - TrueFrequency)
-        
-        SNR = SignalPower / NoisePower
-        SNRValues.append(SNR)
-        
-        AvgEstimates.append(AvgFreqEstimate)
-        AvgErrors.append(Error)
-        Variances.append(Var)
-    
-    InvSNRValues = 1 / np.array(SNRValues)
-    
-    # Plot Results
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
-    
-    ax1.plot(InvSNRValues, AvgEstimates, color='r')
-    # Show ±1 Std Around the Mean Estimate
-    StdDevs = np.sqrt(Variances)
-    ax1.fill_between(InvSNRValues, 
-                     np.array(AvgEstimates) - StdDevs, 
-                     np.array(AvgEstimates) + StdDevs, 
-                     color='r', alpha=0.2)
-    ax1.set_xscale('log')
-    ax1.set_title(f"Test 3: Real-world Signal - Average Frequency Estimate with Noise\n({AudioFile})")
-    ax1.set_ylabel('Frequency Estimate (Hz)')
-    ax1.grid(True)
-    
-    ax2.plot(InvSNRValues, AvgErrors, color='b')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
-    ax2.set_title("Test 3: Real-world Signal - Estimation Error vs. Noise")
-    ax2.set_xlabel('1/SNR')
-    ax2.set_ylabel('Error |f - f_hat| (Hz)')
-    ax2.grid(True)
-    
+    return AudioData, SignalPower, N, TrueFrequency, TargetFs
+
+###############################################
+# Test 1: Frequency Step - Separate Subplots
+###############################################
+def TestFrequencyStep_Subplots():
+    TimeN, XN, TrueFreqs = generate_freq_step_signal(Fs)
+
+    # Compute results
+    T_b1024, F_b1024 = freq_detection(XN, Fs, N=1024)
+    T_b2048, F_b2048 = freq_detection(XN, Fs, N=2048)
+    T_zp, F_zp = freqDetectionZeroPad(XN, Fs, N=1024, padFactor=4)
+    T_w, F_w = FreqDetectionWindowed(XN, Fs, N=1024)
+    T_h, F_h = FreqDetectionHps(XN, Fs, N=1024, harmonics=3)
+
+    fig, axs = plt.subplots(2, 3, figsize=(12, 8))
+    fig.suptitle("Test 1: Frequency Step - Methods in Separate Subplots")
+
+    # True Frequency
+    axs[0, 0].plot(TimeN, TrueFreqs, 'b', label='True Frequency')
+    axs[0, 0].set_title("True Frequency")
+    axs[0, 0].set_xlabel("Time (s)")
+    axs[0, 0].set_ylabel("Frequency (Hz)")
+    axs[0, 0].grid(True)
+    axs[0, 0].legend()
+
+    # Baseline (N=1024)
+    axs[0, 1].plot(TimeN, TrueFreqs, 'b')
+    axs[0, 1].plot(T_b1024, F_b1024, 'r', label='Baseline (N=1024)')
+    axs[0, 1].set_title("Baseline (N=1024)")
+    axs[0, 1].set_xlabel("Time (s)")
+    axs[0, 1].set_ylabel("Frequency (Hz)")
+    axs[0, 1].grid(True)
+    axs[0, 1].legend()
+
+    # Baseline (N=2048)
+    axs[0, 2].plot(TimeN, TrueFreqs, 'b')
+    axs[0, 2].plot(T_b2048, F_b2048, 'g', label='Baseline (N=2048)')
+    axs[0, 2].set_title("Baseline (N=2048)")
+    axs[0, 2].set_xlabel("Time (s)")
+    axs[0, 2].set_ylabel("Frequency (Hz)")
+    axs[0, 2].grid(True)
+    axs[0, 2].legend()
+
+    # Zero-Pad
+    axs[1, 0].plot(TimeN, TrueFreqs, 'b')
+    axs[1, 0].plot(T_zp, F_zp, color='orange', label='Zero-Pad')
+    axs[1, 0].set_title("Zero-Pad")
+    axs[1, 0].set_xlabel("Time (s)")
+    axs[1, 0].set_ylabel("Frequency (Hz)")
+    axs[1, 0].grid(True)
+    axs[1, 0].legend()
+
+    # Windowed
+    axs[1, 1].plot(TimeN, TrueFreqs, 'b')
+    axs[1, 1].plot(T_w, F_w, color='purple', label='Windowed')
+    axs[1, 1].set_title("Windowed")
+    axs[1, 1].set_xlabel("Time (s)")
+    axs[1, 1].set_ylabel("Frequency (Hz)")
+    axs[1, 1].grid(True)
+    axs[1, 1].legend()
+
+    # HPS
+    axs[1, 2].plot(TimeN, TrueFreqs, 'b')
+    axs[1, 2].plot(T_h, F_h, color='brown', label='HPS')
+    axs[1, 2].set_title("HPS")
+    axs[1, 2].set_xlabel("Time (s)")
+    axs[1, 2].set_ylabel("Frequency (Hz)")
+    axs[1, 2].grid(True)
+    axs[1, 2].legend()
+
     plt.tight_layout()
     plt.show()
 
-def TestRealWorldNoise_ZeroPad(AudioFile='./SampleAudio/A4_oboe.wav'):
-    TargetFs = 16_000
+###############################################
+# Test 2: Pure Sine with Noise - Separate Subplots for Each Method
+###############################################
+def TestPureSineNoise_Subplots():
+    TimeN, CleanSignal, Frequency, Amplitude = generate_pure_sine_noise(Fs)
+    SNRValues = np.logspace(-2, 2, 20)
+    NoiseVars = (Amplitude**2 / (2 * SNRValues))
+
+    # Arrays for each method
+    AvgEst_b, Err_b, Std_b = [], [], []
+    AvgEst_zp, Err_zp, Std_zp = [], [], []
+    AvgEst_w, Err_w, Std_w = [], [], []
+    AvgEst_h, Err_h, Std_h = [], [], []
+
+    for NoiseVar in NoiseVars:
+        Noise = np.random.normal(0, np.sqrt(NoiseVar), len(CleanSignal))
+        XN = CleanSignal + Noise
+
+        # Baseline
+        _, Fb = freq_detection(XN, Fs, N=NDFT)
+        Fb = np.array(Fb)
+        eb = np.abs(Fb - Frequency)
+        AvgEst_b.append(np.mean(Fb))
+        Err_b.append(np.mean(eb))
+        Std_b.append(np.std(eb))
+
+        # Zero-Pad
+        _, Fz = freqDetectionZeroPad(XN, Fs, N=NDFT, padFactor=4)
+        Fz = np.array(Fz)
+        ez = np.abs(Fz - Frequency)
+        AvgEst_zp.append(np.mean(Fz))
+        Err_zp.append(np.mean(ez))
+        Std_zp.append(np.std(ez))
+
+        # Windowed
+        _, Fw = FreqDetectionWindowed(XN, Fs, N=NDFT)
+        Fw = np.array(Fw)
+        ew = np.abs(Fw - Frequency)
+        AvgEst_w.append(np.mean(Fw))
+        Err_w.append(np.mean(ew))
+        Std_w.append(np.std(ew))
+
+        # HPS
+        _, Fh = FreqDetectionHps(XN, Fs, N=NDFT, harmonics=3)
+        Fh = np.array(Fh)
+        eh = np.abs(Fh - Frequency)
+        AvgEst_h.append(np.mean(Fh))
+        Err_h.append(np.mean(eh))
+        Std_h.append(np.std(eh))
+
+    InvSNR = 1 / SNRValues
+
+    # Create a figure with subplots: 2 rows (Freq, Error) x 4 cols (Baseline, ZP, W, HPS)
+    fig, axs = plt.subplots(2, 4, figsize=(16, 10))
+    fig.suptitle("Test 2: Pure Sine with Noise - All Methods in Separate Subplots")
+
+    # Baseline (Frequency Estimate)
+    axs[0, 0].plot(InvSNR, AvgEst_b, 'r', label='Baseline')
+    axs[0, 0].fill_between(InvSNR, np.array(AvgEst_b)-Std_b, np.array(AvgEst_b)+Std_b, color='r', alpha=0.2)
+    axs[0, 0].axhline(Frequency, color='black', linestyle='--', label=f"True Freq = {Frequency}Hz")
+    axs[0, 0].set_title("Baseline (Freq Est.)")
+    axs[0, 0].set_xscale('log')
+    axs[0, 0].set_xlabel('1/SNR')
+    axs[0, 0].set_ylabel('Frequency (Hz)')
+    axs[0, 0].grid(True)
+    axs[0, 0].legend()
+
+    # Zero-Pad (Frequency Estimate)
+    axs[0, 1].plot(InvSNR, AvgEst_zp, 'g', label='Zero-Pad')
+    axs[0, 1].fill_between(InvSNR, np.array(AvgEst_zp)-Std_zp, np.array(AvgEst_zp)+Std_zp, color='g', alpha=0.2)
+    axs[0, 1].axhline(Frequency, color='black', linestyle='--')
+    axs[0, 1].set_title("Zero-Pad (Freq Est.)")
+    axs[0, 1].set_xscale('log')
+    axs[0, 1].set_xlabel('1/SNR')
+    axs[0, 1].set_ylabel('Frequency (Hz)')
+    axs[0, 1].grid(True)
+    axs[0, 1].legend()
+
+    # Windowed (Frequency Estimate)
+    axs[0, 2].plot(InvSNR, AvgEst_w, color='purple', label='Windowed')
+    axs[0, 2].fill_between(InvSNR, np.array(AvgEst_w)-Std_w, np.array(AvgEst_w)+Std_w, color='purple', alpha=0.2)
+    axs[0, 2].axhline(Frequency, color='black', linestyle='--')
+    axs[0, 2].set_title("Windowed (Freq Est.)")
+    axs[0, 2].set_xscale('log')
+    axs[0, 2].set_xlabel('1/SNR')
+    axs[0, 2].set_ylabel('Frequency (Hz)')
+    axs[0, 2].grid(True)
+    axs[0, 2].legend()
+
+    # HPS (Frequency Estimate)
+    axs[0, 3].plot(InvSNR, AvgEst_h, color='orange', label='HPS')
+    axs[0, 3].fill_between(InvSNR, np.array(AvgEst_h)-Std_h, np.array(AvgEst_h)+Std_h, color='orange', alpha=0.2)
+    axs[0, 3].axhline(Frequency, color='black', linestyle='--')
+    axs[0, 3].set_title("HPS (Freq Est.)")
+    axs[0, 3].set_xscale('log')
+    axs[0, 3].set_xlabel('1/SNR')
+    axs[0, 3].set_ylabel('Frequency (Hz)')
+    axs[0, 3].grid(True)
+    axs[0, 3].legend()
+
+    # Baseline (Error)
+    axs[1, 0].plot(InvSNR, Err_b, 'r')
+    axs[1, 0].set_title("Baseline (Error)")
+    axs[1, 0].set_xscale('log')
+    axs[1, 0].set_yscale('log')
+    axs[1, 0].set_xlabel('1/SNR')
+    axs[1, 0].set_ylabel('Error |f - f_hat| (Hz)')
+    axs[1, 0].grid(True)
+
+    # Zero-Pad (Error)
+    axs[1, 1].plot(InvSNR, Err_zp, 'g')
+    axs[1, 1].set_title("Zero-Pad (Error)")
+    axs[1, 1].set_xscale('log')
+    axs[1, 1].set_yscale('log')
+    axs[1, 1].set_xlabel('1/SNR')
+    axs[1, 1].set_ylabel('Error |f - f_hat| (Hz)')
+    axs[1, 1].grid(True)
+
+    # Windowed (Error)
+    axs[1, 2].plot(InvSNR, Err_w, color='purple')
+    axs[1, 2].set_title("Windowed (Error)")
+    axs[1, 2].set_xscale('log')
+    axs[1, 2].set_yscale('log')
+    axs[1, 2].set_xlabel('1/SNR')
+    axs[1, 2].set_ylabel('Error |f - f_hat| (Hz)')
+    axs[1, 2].grid(True)
+
+    # HPS (Error)
+    axs[1, 3].plot(InvSNR, Err_h, color='orange')
+    axs[1, 3].set_title("HPS (Error)")
+    axs[1, 3].set_xscale('log')
+    axs[1, 3].set_yscale('log')
+    axs[1, 3].set_xlabel('1/SNR')
+    axs[1, 3].set_ylabel('Error |f - f_hat| (Hz)')
+    axs[1, 3].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+###############################################
+# Test 3: Real-world - Separate Subplots
+###############################################
+def TestRealWorld_Subplots(AudioFile='./SampleAudio/A4_oboe.wav'):
+    TargetFs = 16000
     Duration = 2.2
-    N = int(Duration * TargetFs)
     TrueFrequency = 440
 
-    OrigFs, AudioData = wavfile.read(AudioFile)
-    AudioData = AudioData.astype(np.float32) / np.max(np.abs(AudioData))  # Normalize
+    AudioData, SignalPower, N, TrueFrequency, TargetFs = load_and_prepare_audio(AudioFile, TargetFs, Duration, TrueFrequency)
+    NoisePowers = np.logspace(-2, 3, 20)  # increased range if needed
 
-    if OrigFs != TargetFs:
-        AudioData = resample_poly(AudioData, TargetFs, OrigFs)
-
-    if len(AudioData) < N:
-        AudioData = np.pad(AudioData, (0, N - len(AudioData)), 'constant')
-    else:
-        AudioData = AudioData[:N]
-
-    SignalPower = np.mean(AudioData**2)
-
-    NoisePowers = np.logspace(-2, 2, 20)
-    AvgEstimates = []
-    AvgErrors = []
-    Variances = []
-    SNRValues = []
+    AvgEst_b, Err_b, Var_b = [], [], []
+    AvgEst_zp, Err_zp, Var_zp = [], [], []
+    AvgEst_w, Err_w, Var_w = [], [], []
+    AvgEst_h, Err_h, Var_h = [], [], []
 
     for NoisePower in NoisePowers:
         Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
         NoisySignal = AudioData + Noise
         
-        # Using zero-padding method here:
-        _, Freqs = freqDetectionZeroPad(NoisySignal, TargetFs, N=2048, padFactor=4)
-        Freqs = np.clip(Freqs, 0, TargetFs/2)
+        # Baseline
+        _, Fb = freq_detection(NoisySignal, TargetFs, N=2048)
+        Fb = np.clip(Fb, 0, TargetFs/2)
+        eb = np.abs(Fb - TrueFrequency)
+        AvgEst_b.append(np.mean(Fb))
+        Err_b.append(np.mean(eb))
+        Var_b.append(np.var(Fb))
 
-        AvgFreqEstimate = np.mean(Freqs)
-        Var = np.var(Freqs)
-        Error = np.abs(AvgFreqEstimate - TrueFrequency)
+        # Zero-Pad
+        _, Fz = freqDetectionZeroPad(NoisySignal, TargetFs, N=2048, padFactor=4)
+        Fz = np.clip(Fz, 0, TargetFs/2)
+        ez = np.abs(Fz - TrueFrequency)
+        AvgEst_zp.append(np.mean(Fz))
+        Err_zp.append(np.mean(ez))
+        Var_zp.append(np.var(Fz))
 
-        SNR = SignalPower / NoisePower
-        SNRValues.append(SNR)
+        # Windowed
+        _, Fw = FreqDetectionWindowed(NoisySignal, TargetFs, N=2048)
+        Fw = np.clip(Fw, 0, TargetFs/2)
+        ew = np.abs(Fw - TrueFrequency)
+        AvgEst_w.append(np.mean(Fw))
+        Err_w.append(np.mean(ew))
+        Var_w.append(np.var(Fw))
 
-        AvgEstimates.append(AvgFreqEstimate)
-        AvgErrors.append(Error)
-        Variances.append(Var)
+        # HPS
+        _, Fh = FreqDetectionHps(NoisySignal, TargetFs, N=2048, harmonics=3)
+        Fh = np.clip(Fh, 0, TargetFs/2)
+        eh = np.abs(Fh - TrueFrequency)
+        AvgEst_h.append(np.mean(Fh))
+        Err_h.append(np.mean(eh))
+        Var_h.append(np.var(Fh))
 
-    InvSNRValues = 1 / np.array(SNRValues)
+    SNRValues = SignalPower / NoisePowers
+    InvSNRValues = 1 / SNRValues
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
+    Std_b = np.sqrt(Var_b)
+    Std_zp = np.sqrt(Var_zp)
+    Std_w = np.sqrt(Var_w)
+    Std_h = np.sqrt(Var_h)
 
-    ax1.plot(InvSNRValues, AvgEstimates, color='g')
-    StdDevs = np.sqrt(Variances)
-    ax1.fill_between(InvSNRValues, 
-                     np.array(AvgEstimates) - StdDevs, 
-                     np.array(AvgEstimates) + StdDevs, 
-                     color='g', alpha=0.2)
-    ax1.set_xscale('log')
-    ax1.set_title(f"Test 3: Real-world (Zero-Pad) - Avg Frequency w/ Noise\n({AudioFile})")
-    ax1.set_ylabel('Frequency Estimate (Hz)')
-    ax1.grid(True)
+    fig, axs = plt.subplots(2, 4, figsize=(16, 10))
+    fig.suptitle(f"Test 3: Real-world ({AudioFile}) - All Methods in Separate Subplots")
 
-    ax2.plot(InvSNRValues, AvgErrors, color='b')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
-    ax2.set_title("Test 3: Real-world (Zero-Pad) - Estimation Error vs. Noise")
-    ax2.set_xlabel('1/SNR')
-    ax2.set_ylabel('Error |f - f_hat| (Hz)')
-    ax2.grid(True)
+    # Baseline (Frequency Estimate)
+    axs[0, 0].plot(InvSNRValues, AvgEst_b, 'r', label='Baseline')
+    axs[0, 0].fill_between(InvSNRValues, np.array(AvgEst_b)-Std_b, np.array(AvgEst_b)+Std_b, color='r', alpha=0.2)
+    axs[0, 0].axhline(TrueFrequency, color='black', linestyle='--', label=f'True Freq={TrueFrequency}Hz')
+    axs[0, 0].set_xscale('log')
+    axs[0, 0].set_title("Baseline (Freq Est.)")
+    axs[0, 0].set_xlabel('1/SNR')
+    axs[0, 0].set_ylabel('Frequency (Hz)')
+    axs[0, 0].grid(True)
+    axs[0, 0].legend()
 
-    plt.tight_layout()
-    plt.show()
+    # Zero-Pad (Frequency Estimate)
+    axs[0, 1].plot(InvSNRValues, AvgEst_zp, 'g', label='Zero-Pad')
+    axs[0, 1].fill_between(InvSNRValues, np.array(AvgEst_zp)-Std_zp, np.array(AvgEst_zp)+Std_zp, color='g', alpha=0.2)
+    axs[0, 1].axhline(TrueFrequency, color='black', linestyle='--')
+    axs[0, 1].set_xscale('log')
+    axs[0, 1].set_title("Zero-Pad (Freq Est.)")
+    axs[0, 1].set_xlabel('1/SNR')
+    axs[0, 1].set_ylabel('Frequency (Hz)')
+    axs[0, 1].grid(True)
+    axs[0, 1].legend()
 
+    # Windowed (Frequency Estimate)
+    axs[0, 2].plot(InvSNRValues, AvgEst_w, color='purple', label='Windowed')
+    axs[0, 2].fill_between(InvSNRValues, np.array(AvgEst_w)-Std_w, np.array(AvgEst_w)+Std_w, color='purple', alpha=0.2)
+    axs[0, 2].axhline(TrueFrequency, color='black', linestyle='--')
+    axs[0, 2].set_xscale('log')
+    axs[0, 2].set_title("Windowed (Freq Est.)")
+    axs[0, 2].set_xlabel('1/SNR')
+    axs[0, 2].set_ylabel('Frequency (Hz)')
+    axs[0, 2].grid(True)
+    axs[0, 2].legend()
 
-def TestRealWorldNoise_Windowed(AudioFile='./SampleAudio/A4_oboe.wav'):
-    TargetFs = 16_000
-    Duration = 2.2
-    N = int(Duration * TargetFs)
-    TrueFrequency = 440
+    # HPS (Frequency Estimate)
+    axs[0, 3].plot(InvSNRValues, AvgEst_h, color='orange', label='HPS')
+    axs[0, 3].fill_between(InvSNRValues, np.array(AvgEst_h)-Std_h, np.array(AvgEst_h)+Std_h, color='orange', alpha=0.2)
+    axs[0, 3].axhline(TrueFrequency, color='black', linestyle='--')
+    axs[0, 3].set_xscale('log')
+    axs[0, 3].set_title("HPS (Freq Est.)")
+    axs[0, 3].set_xlabel('1/SNR')
+    axs[0, 3].set_ylabel('Frequency (Hz)')
+    axs[0, 3].grid(True)
+    axs[0, 3].legend()
 
-    OrigFs, AudioData = wavfile.read(AudioFile)
-    AudioData = AudioData.astype(np.float32) / np.max(np.abs(AudioData))  # Normalize
+    # Baseline (Error)
+    axs[1, 0].plot(InvSNRValues, Err_b, 'r')
+    axs[1, 0].set_xscale('log')
+    axs[1, 0].set_yscale('log')
+    axs[1, 0].set_title("Baseline (Error)")
+    axs[1, 0].set_xlabel('1/SNR')
+    axs[1, 0].set_ylabel('Error (Hz)')
+    axs[1, 0].grid(True)
 
-    if OrigFs != TargetFs:
-        AudioData = resample_poly(AudioData, TargetFs, OrigFs)
+    # Zero-Pad (Error)
+    axs[1, 1].plot(InvSNRValues, Err_zp, 'g')
+    axs[1, 1].set_xscale('log')
+    axs[1, 1].set_yscale('log')
+    axs[1, 1].set_title("Zero-Pad (Error)")
+    axs[1, 1].set_xlabel('1/SNR')
+    axs[1, 1].set_ylabel('Error (Hz)')
+    axs[1, 1].grid(True)
 
-    if len(AudioData) < N:
-        AudioData = np.pad(AudioData, (0, N - len(AudioData)), 'constant')
-    else:
-        AudioData = AudioData[:N]
+    # Windowed (Error)
+    axs[1, 2].plot(InvSNRValues, Err_w, color='purple')
+    axs[1, 2].set_xscale('log')
+    axs[1, 2].set_yscale('log')
+    axs[1, 2].set_title("Windowed (Error)")
+    axs[1, 2].set_xlabel('1/SNR')
+    axs[1, 2].set_ylabel('Error (Hz)')
+    axs[1, 2].grid(True)
 
-    SignalPower = np.mean(AudioData**2)
-
-    NoisePowers = np.logspace(-2, 2, 20)
-    AvgEstimates = []
-    AvgErrors = []
-    Variances = []
-    SNRValues = []
-
-    for NoisePower in NoisePowers:
-        Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
-        NoisySignal = AudioData + Noise
-        
-        # Using windowed method
-        _, Freqs = FreqDetectionWindowed(NoisySignal, TargetFs, N=2048)
-        Freqs = np.clip(Freqs, 0, TargetFs/2)
-
-        AvgFreqEstimate = np.mean(Freqs)
-        Var = np.var(Freqs)
-        Error = np.abs(AvgFreqEstimate - TrueFrequency)
-
-        SNR = SignalPower / NoisePower
-        SNRValues.append(SNR)
-
-        AvgEstimates.append(AvgFreqEstimate)
-        AvgErrors.append(Error)
-        Variances.append(Var)
-
-    InvSNRValues = 1 / np.array(SNRValues)
-
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
-
-    ax1.plot(InvSNRValues, AvgEstimates, color='purple')
-    StdDevs = np.sqrt(Variances)
-    ax1.fill_between(InvSNRValues, 
-                     np.array(AvgEstimates) - StdDevs, 
-                     np.array(AvgEstimates) + StdDevs, 
-                     color='purple', alpha=0.2)
-    ax1.set_xscale('log')
-    ax1.set_title(f"Test 3: Real-world (Windowed) - Avg Frequency w/ Noise\n({AudioFile})")
-    ax1.set_ylabel('Frequency Estimate (Hz)')
-    ax1.grid(True)
-
-    ax2.plot(InvSNRValues, AvgErrors, color='b')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
-    ax2.set_title("Test 3: Real-world (Windowed) - Estimation Error vs. Noise")
-    ax2.set_xlabel('1/SNR')
-    ax2.set_ylabel('Error |f - f_hat| (Hz)')
-    ax2.grid(True)
-
-    plt.tight_layout()
-    plt.show()
-
-
-def TestRealWorldNoise_Hps(AudioFile='./SampleAudio/A4_oboe.wav'):
-    TargetFs = 16_000
-    Duration = 2.2
-    N = int(Duration * TargetFs)
-    TrueFrequency = 440
-
-    OrigFs, AudioData = wavfile.read(AudioFile)
-    AudioData = AudioData.astype(np.float32) / np.max(np.abs(AudioData))  # Normalize
-
-    if OrigFs != TargetFs:
-        AudioData = resample_poly(AudioData, TargetFs, OrigFs)
-
-    if len(AudioData) < N:
-        AudioData = np.pad(AudioData, (0, N - len(AudioData)), 'constant')
-    else:
-        AudioData = AudioData[:N]
-
-    SignalPower = np.mean(AudioData**2)
-
-    NoisePowers = np.logspace(-2, 2, 20)
-    AvgEstimates = []
-    AvgErrors = []
-    Variances = []
-    SNRValues = []
-
-    for NoisePower in NoisePowers:
-        Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
-        NoisySignal = AudioData + Noise
-        
-        # Using HPS method
-        _, Freqs = FreqDetectionHps(NoisySignal, TargetFs, N=2048, harmonics=3)
-        Freqs = np.clip(Freqs, 0, TargetFs/2)
-
-        AvgFreqEstimate = np.mean(Freqs)
-        Var = np.var(Freqs)
-        Error = np.abs(AvgFreqEstimate - TrueFrequency)
-
-        SNR = SignalPower / NoisePower
-        SNRValues.append(SNR)
-
-        AvgEstimates.append(AvgFreqEstimate)
-        AvgErrors.append(Error)
-        Variances.append(Var)
-
-    InvSNRValues = 1 / np.array(SNRValues)
-
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
-
-    ax1.plot(InvSNRValues, AvgEstimates, color='orange')
-    StdDevs = np.sqrt(Variances)
-    ax1.fill_between(InvSNRValues, 
-                     np.array(AvgEstimates) - StdDevs, 
-                     np.array(AvgEstimates) + StdDevs, 
-                     color='orange', alpha=0.2)
-    ax1.set_xscale('log')
-    ax1.set_title(f"Test 3: Real-world (HPS) - Avg Frequency w/ Noise\n({AudioFile})")
-    ax1.set_ylabel('Frequency Estimate (Hz)')
-    ax1.grid(True)
-
-    ax2.plot(InvSNRValues, AvgErrors, color='b')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
-    ax2.set_title("Test 3: Real-world (HPS) - Estimation Error vs. Noise")
-    ax2.set_xlabel('1/SNR')
-    ax2.set_ylabel('Error |f - f_hat| (Hz)')
-    ax2.grid(True)
+    # HPS (Error)
+    axs[1, 3].plot(InvSNRValues, Err_h, color='orange')
+    axs[1, 3].set_xscale('log')
+    axs[1, 3].set_yscale('log')
+    axs[1, 3].set_title("HPS (Error)")
+    axs[1, 3].set_xlabel('1/SNR')
+    axs[1, 3].set_ylabel('Error (Hz)')
+    axs[1, 3].grid(True)
 
     plt.tight_layout()
     plt.show()
-
 
 ###############################################
-# Test 4 Variations: Vocal Audio with Noise
+# Test 4: Vocal - Separate Subplots
 ###############################################
+def TestVocal_Subplots(AudioFile='SampleAudio/Zauberflöte_vocal.wav', TargetFs=16000, Duration=2.2, TrueFrequency=440, NDFT=2048):
+    AudioData, SignalPower, N, TrueFrequency, TargetFs = load_and_prepare_audio(AudioFile, TargetFs, Duration, TrueFrequency)
+    NoisePowers = np.logspace(-2, 3, 20)
 
-def TestVocalNoise(AudioFile='SampleAudio/Zauberflöte_vocal.wav',
-                   TargetFs=16000, Duration=2.2, TrueFrequency=440, NDFT=2048):
-    """
-    Analyze a vocal audio file, adding varying levels of noise, and 
-    evaluate frequency detection accuracy.
-    """
-    # Load and Preprocess Audio
-    OrigFs, AudioData = wavfile.read(AudioFile)
-    AudioData = AudioData.astype(np.float32) / np.max(np.abs(AudioData))  # Normalize
-    
-    N = int(Duration * TargetFs)
-    
-    # Resample if Needed
-    if OrigFs != TargetFs:
-        AudioData = resample_poly(AudioData, TargetFs, OrigFs)
-    
-    # Ensure We Have N Samples (Pad or Truncate)
-    if len(AudioData) < N:
-        AudioData = np.pad(AudioData, (0, N - len(AudioData)), 'constant')
-    else:
-        AudioData = AudioData[:N]
-        
-    # Calculate Signal Power
-    SignalPower = np.mean(AudioData**2)
-    
-    # Define Noise Powers and Arrays to Store Results
-    NoisePowers = np.logspace(-2, 2, 20)
-    AvgEstimates = []
-    AvgErrors = []
-    Variances = []
-    SNRValues = []
-    
-    for NoisePower in NoisePowers:
-        Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
-        NoisySignal = AudioData + Noise
-        
-        # Frequency Detection
-        _, Freqs = freq_detection(NoisySignal, TargetFs, N=NDFT)
-        
-        # Clip Frequencies to a Reasonable Range
-        Freqs = np.clip(Freqs, 0, TargetFs/2)
-        
-        AvgFreqEstimate = np.mean(Freqs)
-        Var = np.var(Freqs)
-        Error = np.abs(AvgFreqEstimate - TrueFrequency)
-        
-        SNR = SignalPower / NoisePower
-        SNRValues.append(SNR)
-        
-        AvgEstimates.append(AvgFreqEstimate)
-        AvgErrors.append(Error)
-        Variances.append(Var)
-    
-    InvSNRValues = 1 / np.array(SNRValues)
-    
-    # Plot Results
-    fig, (Ax1, Ax2) = plt.subplots(2, 1, figsize=(10, 10))
-    
-    Ax1.plot(InvSNRValues, AvgEstimates, color='r')
-    StdDevs = np.sqrt(Variances)
-    Ax1.fill_between(InvSNRValues, 
-                     np.array(AvgEstimates) - StdDevs, 
-                     np.array(AvgEstimates) + StdDevs, 
-                     color='r', alpha=0.2)
-    Ax1.set_xscale('log')
-    Ax1.set_title(f"Vocal Test: Average Frequency Estimate with Noise\n({AudioFile})")
-    Ax1.set_ylabel('Frequency Estimate (Hz)')
-    Ax1.grid(True)
-    
-    Ax2.plot(InvSNRValues, AvgErrors, color='b')
-    Ax2.set_xscale('log')
-    Ax2.set_yscale('log')
-    Ax2.set_title("Vocal Test: Estimation Error vs. Noise")
-    Ax2.set_xlabel('1/SNR')
-    Ax2.set_ylabel('Error |f - f_hat| (Hz)')
-    Ax2.grid(True)
-    
-    plt.tight_layout()
-    plt.show()
-
-def TestVocalNoise_ZeroPad(AudioFile='SampleAudio/Zauberflöte_vocal.wav',
-                           TargetFs=16000, Duration=2.2, TrueFrequency=440, NDFT=2048):
-    OrigFs, AudioData = wavfile.read(AudioFile)
-    AudioData = AudioData.astype(np.float32) / np.max(np.abs(AudioData))  # Normalize
-
-    N = int(Duration * TargetFs)
-
-    if OrigFs != TargetFs:
-        AudioData = resample_poly(AudioData, TargetFs, OrigFs)
-
-    if len(AudioData) < N:
-        AudioData = np.pad(AudioData, (0, N - len(AudioData)), 'constant')
-    else:
-        AudioData = AudioData[:N]
-
-    SignalPower = np.mean(AudioData**2)
-
-    NoisePowers = np.logspace(-2, 2, 20)
-    AvgEstimates = []
-    AvgErrors = []
-    Variances = []
-    SNRValues = []
+    AvgEst_b, Err_b, Var_b = [], [], []
+    AvgEst_zp, Err_zp, Var_zp = [], [], []
+    AvgEst_w, Err_w, Var_w = [], [], []
+    AvgEst_h, Err_h, Var_h = [], [], []
 
     for NoisePower in NoisePowers:
         Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
         NoisySignal = AudioData + Noise
 
-        # Zero-pad method
-        _, Freqs = freqDetectionZeroPad(NoisySignal, TargetFs, N=NDFT, padFactor=4)
-        Freqs = np.clip(Freqs, 0, TargetFs/2)
+        # Baseline
+        _, Fb = freq_detection(NoisySignal, TargetFs, N=NDFT)
+        Fb = np.clip(Fb, 0, TargetFs/2)
+        eb = np.abs(Fb - TrueFrequency)
+        AvgEst_b.append(np.mean(Fb))
+        Err_b.append(np.mean(eb))
+        Var_b.append(np.var(Fb))
 
-        AvgFreqEstimate = np.mean(Freqs)
-        Var = np.var(Freqs)
-        Error = np.abs(AvgFreqEstimate - TrueFrequency)
+        # Zero-Pad
+        _, Fz = freqDetectionZeroPad(NoisySignal, TargetFs, N=NDFT, padFactor=4)
+        Fz = np.clip(Fz, 0, TargetFs/2)
+        ez = np.abs(Fz - TrueFrequency)
+        AvgEst_zp.append(np.mean(Fz))
+        Err_zp.append(np.mean(ez))
+        Var_zp.append(np.var(Fz))
 
-        SNR = SignalPower / NoisePower
-        SNRValues.append(SNR)
+        # Windowed
+        _, Fw = FreqDetectionWindowed(NoisySignal, TargetFs, N=NDFT)
+        Fw = np.clip(Fw, 0, TargetFs/2)
+        ew = np.abs(Fw - TrueFrequency)
+        AvgEst_w.append(np.mean(Fw))
+        Err_w.append(np.mean(ew))
+        Var_w.append(np.var(Fw))
 
-        AvgEstimates.append(AvgFreqEstimate)
-        AvgErrors.append(Error)
-        Variances.append(Var)
+        # HPS
+        _, Fh = FreqDetectionHps(NoisySignal, TargetFs, N=NDFT, harmonics=3)
+        Fh = np.clip(Fh, 0, TargetFs/2)
+        eh = np.abs(Fh - TrueFrequency)
+        AvgEst_h.append(np.mean(Fh))
+        Err_h.append(np.mean(eh))
+        Var_h.append(np.var(Fh))
 
-    InvSNRValues = 1 / np.array(SNRValues)
-    fig, (Ax1, Ax2) = plt.subplots(2, 1, figsize=(10, 10))
+    SNRValues = SignalPower / NoisePowers
+    InvSNRValues = 1 / SNRValues
 
-    Ax1.plot(InvSNRValues, AvgEstimates, color='g')
-    StdDevs = np.sqrt(Variances)
-    Ax1.fill_between(InvSNRValues, 
-                     np.array(AvgEstimates) - StdDevs, 
-                     np.array(AvgEstimates) + StdDevs, 
-                     color='g', alpha=0.2)
-    Ax1.set_xscale('log')
-    Ax1.set_title(f"Vocal Test (Zero-Pad): Average Frequency Estimate with Noise\n({AudioFile})")
-    Ax1.set_ylabel('Frequency Estimate (Hz)')
-    Ax1.grid(True)
+    Std_b = np.sqrt(Var_b)
+    Std_zp = np.sqrt(Var_zp)
+    Std_w = np.sqrt(Var_w)
+    Std_h = np.sqrt(Var_h)
 
-    Ax2.plot(InvSNRValues, AvgErrors, color='b')
-    Ax2.set_xscale('log')
-    Ax2.set_yscale('log')
-    Ax2.set_title("Vocal Test (Zero-Pad): Estimation Error vs. Noise")
-    Ax2.set_xlabel('1/SNR')
-    Ax2.set_ylabel('Error |f - f_hat| (Hz)')
-    Ax2.grid(True)
+    fig, axs = plt.subplots(2, 4, figsize=(16, 10))
+    fig.suptitle(f"Test 4: Vocal ({AudioFile}) - All Methods in Separate Subplots")
 
-    plt.tight_layout()
-    plt.show()
+    # Baseline (Freq)
+    axs[0, 0].plot(InvSNRValues, AvgEst_b, 'r')
+    axs[0, 0].fill_between(InvSNRValues, np.array(AvgEst_b)-Std_b, np.array(AvgEst_b)+Std_b, color='r', alpha=0.2)
+    axs[0, 0].axhline(TrueFrequency, color='black', linestyle='--', label=f'True={TrueFrequency}Hz')
+    axs[0, 0].set_xscale('log')
+    axs[0, 0].set_title("Baseline (Freq Est.)")
+    axs[0, 0].set_xlabel('1/SNR')
+    axs[0, 0].set_ylabel('Frequency (Hz)')
+    axs[0, 0].grid(True)
+    axs[0, 0].legend()
 
+    # Zero-Pad (Freq)
+    axs[0, 1].plot(InvSNRValues, AvgEst_zp, 'g')
+    axs[0, 1].fill_between(InvSNRValues, np.array(AvgEst_zp)-Std_zp, np.array(AvgEst_zp)+Std_zp, color='g', alpha=0.2)
+    axs[0, 1].axhline(TrueFrequency, color='black', linestyle='--')
+    axs[0, 1].set_xscale('log')
+    axs[0, 1].set_title("Zero-Pad (Freq Est.)")
+    axs[0, 1].set_xlabel('1/SNR')
+    axs[0, 1].set_ylabel('Frequency (Hz)')
+    axs[0, 1].grid(True)
 
-def TestVocalNoise_Windowed(AudioFile='SampleAudio/Zauberflöte_vocal.wav',
-                            TargetFs=16000, Duration=2.2, TrueFrequency=440, NDFT=2048):
-    OrigFs, AudioData = wavfile.read(AudioFile)
-    AudioData = AudioData.astype(np.float32) / np.max(np.abs(AudioData))  # Normalize
+    # Windowed (Freq)
+    axs[0, 2].plot(InvSNRValues, AvgEst_w, color='purple')
+    axs[0, 2].fill_between(InvSNRValues, np.array(AvgEst_w)-Std_w, np.array(AvgEst_w)+Std_w, color='purple', alpha=0.2)
+    axs[0, 2].axhline(TrueFrequency, color='black', linestyle='--')
+    axs[0, 2].set_xscale('log')
+    axs[0, 2].set_title("Windowed (Freq Est.)")
+    axs[0, 2].set_xlabel('1/SNR')
+    axs[0, 2].set_ylabel('Frequency (Hz)')
+    axs[0, 2].grid(True)
 
-    N = int(Duration * TargetFs)
+    # HPS (Freq)
+    axs[0, 3].plot(InvSNRValues, AvgEst_h, color='orange')
+    axs[0, 3].fill_between(InvSNRValues, np.array(AvgEst_h)-Std_h, np.array(AvgEst_h)+Std_h, color='orange', alpha=0.2)
+    axs[0, 3].axhline(TrueFrequency, color='black', linestyle='--')
+    axs[0, 3].set_xscale('log')
+    axs[0, 3].set_title("HPS (Freq Est.)")
+    axs[0, 3].set_xlabel('1/SNR')
+    axs[0, 3].set_ylabel('Frequency (Hz)')
+    axs[0, 3].grid(True)
 
-    if OrigFs != TargetFs:
-        AudioData = resample_poly(AudioData, TargetFs, OrigFs)
+    # Baseline (Error)
+    axs[1, 0].plot(InvSNRValues, Err_b, 'r')
+    axs[1, 0].set_xscale('log')
+    axs[1, 0].set_yscale('log')
+    axs[1, 0].set_title("Baseline (Error)")
+    axs[1, 0].set_xlabel('1/SNR')
+    axs[1, 0].set_ylabel('Error (Hz)')
+    axs[1, 0].grid(True)
 
-    if len(AudioData) < N:
-        AudioData = np.pad(AudioData, (0, N - len(AudioData)), 'constant')
-    else:
-        AudioData = AudioData[:N]
+    # Zero-Pad (Error)
+    axs[1, 1].plot(InvSNRValues, Err_zp, 'g')
+    axs[1, 1].set_xscale('log')
+    axs[1, 1].set_yscale('log')
+    axs[1, 1].set_title("Zero-Pad (Error)")
+    axs[1, 1].set_xlabel('1/SNR')
+    axs[1, 1].set_ylabel('Error (Hz)')
+    axs[1, 1].grid(True)
 
-    SignalPower = np.mean(AudioData**2)
+    # Windowed (Error)
+    axs[1, 2].plot(InvSNRValues, Err_w, color='purple')
+    axs[1, 2].set_xscale('log')
+    axs[1, 2].set_yscale('log')
+    axs[1, 2].set_title("Windowed (Error)")
+    axs[1, 2].set_xlabel('1/SNR')
+    axs[1, 2].set_ylabel('Error (Hz)')
+    axs[1, 2].grid(True)
 
-    NoisePowers = np.logspace(-2, 2, 20)
-    AvgEstimates = []
-    AvgErrors = []
-    Variances = []
-    SNRValues = []
-
-    for NoisePower in NoisePowers:
-        Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
-        NoisySignal = AudioData + Noise
-
-        # Windowed method
-        _, Freqs = FreqDetectionWindowed(NoisySignal, TargetFs, N=NDFT)
-        Freqs = np.clip(Freqs, 0, TargetFs/2)
-
-        AvgFreqEstimate = np.mean(Freqs)
-        Var = np.var(Freqs)
-        Error = np.abs(AvgFreqEstimate - TrueFrequency)
-
-        SNR = SignalPower / NoisePower
-        SNRValues.append(SNR)
-
-        AvgEstimates.append(AvgFreqEstimate)
-        AvgErrors.append(Error)
-        Variances.append(Var)
-
-    InvSNRValues = 1 / np.array(SNRValues)
-    fig, (Ax1, Ax2) = plt.subplots(2, 1, figsize=(10, 10))
-
-    Ax1.plot(InvSNRValues, AvgEstimates, color='purple')
-    StdDevs = np.sqrt(Variances)
-    Ax1.fill_between(InvSNRValues, 
-                     np.array(AvgEstimates) - StdDevs, 
-                     np.array(AvgEstimates) + StdDevs, 
-                     color='purple', alpha=0.2)
-    Ax1.set_xscale('log')
-    Ax1.set_title(f"Vocal Test (Windowed): Average Frequency Estimate with Noise\n({AudioFile})")
-    Ax1.set_ylabel('Frequency Estimate (Hz)')
-    Ax1.grid(True)
-
-    Ax2.plot(InvSNRValues, AvgErrors, color='b')
-    Ax2.set_xscale('log')
-    Ax2.set_yscale('log')
-    Ax2.set_title("Vocal Test (Windowed): Estimation Error vs. Noise")
-    Ax2.set_xlabel('1/SNR')
-    Ax2.set_ylabel('Error |f - f_hat| (Hz)')
-    Ax2.grid(True)
-
-    plt.tight_layout()
-    plt.show()
-
-
-def TestVocalNoise_Hps(AudioFile='SampleAudio/Zauberflöte_vocal.wav',
-                       TargetFs=16000, Duration=2.2, TrueFrequency=440, NDFT=2048):
-    OrigFs, AudioData = wavfile.read(AudioFile)
-    AudioData = AudioData.astype(np.float32) / np.max(np.abs(AudioData))  # Normalize
-
-    N = int(Duration * TargetFs)
-
-    if OrigFs != TargetFs:
-        AudioData = resample_poly(AudioData, TargetFs, OrigFs)
-
-    if len(AudioData) < N:
-        AudioData = np.pad(AudioData, (0, N - len(AudioData)), 'constant')
-    else:
-        AudioData = AudioData[:N]
-
-    SignalPower = np.mean(AudioData**2)
-
-    NoisePowers = np.logspace(-2, 2, 20)
-    AvgEstimates = []
-    AvgErrors = []
-    Variances = []
-    SNRValues = []
-
-    for NoisePower in NoisePowers:
-        Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
-        NoisySignal = AudioData + Noise
-
-        # HPS method
-        _, Freqs = FreqDetectionHps(NoisySignal, TargetFs, N=NDFT, harmonics=3)
-        Freqs = np.clip(Freqs, 0, TargetFs/2)
-
-        AvgFreqEstimate = np.mean(Freqs)
-        Var = np.var(Freqs)
-        Error = np.abs(AvgFreqEstimate - TrueFrequency)
-
-        SNR = SignalPower / NoisePower
-        SNRValues.append(SNR)
-
-        AvgEstimates.append(AvgFreqEstimate)
-        AvgErrors.append(Error)
-        Variances.append(Var)
-
-    InvSNRValues = 1 / np.array(SNRValues)
-    fig, (Ax1, Ax2) = plt.subplots(2, 1, figsize=(10, 10))
-
-    Ax1.plot(InvSNRValues, AvgEstimates, color='orange')
-    StdDevs = np.sqrt(Variances)
-    Ax1.fill_between(InvSNRValues, 
-                     np.array(AvgEstimates) - StdDevs, 
-                     np.array(AvgEstimates) + StdDevs, 
-                     color='orange', alpha=0.2)
-    Ax1.set_xscale('log')
-    Ax1.set_title(f"Vocal Test (HPS): Average Frequency Estimate with Noise\n({AudioFile})")
-    Ax1.set_ylabel('Frequency Estimate (Hz)')
-    Ax1.grid(True)
-
-    Ax2.plot(InvSNRValues, AvgErrors, color='b')
-    Ax2.set_xscale('log')
-    Ax2.set_yscale('log')
-    Ax2.set_title("Vocal Test (HPS): Estimation Error vs. Noise")
-    Ax2.set_xlabel('1/SNR')
-    Ax2.set_ylabel('Error |f - f_hat| (Hz)')
-    Ax2.grid(True)
+    # HPS (Error)
+    axs[1, 3].plot(InvSNRValues, Err_h, color='orange')
+    axs[1, 3].set_xscale('log')
+    axs[1, 3].set_yscale('log')
+    axs[1, 3].set_title("HPS (Error)")
+    axs[1, 3].set_xlabel('1/SNR')
+    axs[1, 3].set_ylabel('Error (Hz)')
+    axs[1, 3].grid(True)
 
     plt.tight_layout()
     plt.show()
@@ -940,29 +551,7 @@ def TestVocalNoise_Hps(AudioFile='SampleAudio/Zauberflöte_vocal.wav',
 # Run All Tests
 ###############################################
 if __name__ == "__main__":
-    # Baseline Tests
-    TestFrequencyStep()
-    TestPureSineNoise()
-    TestRealWorldNoise('./SampleAudio/A4_oboe.wav')
-    TestVocalNoise()
-
-    # Improved Method Tests: 
-    # Frequency Step
-    TestFrequencyStep_ZeroPad()
-    TestFrequencyStep_Windowed()
-    TestFrequencyStep_Hps()
-    
-    # Pure Sine Noise
-    TestPureSineNoise_ZeroPad()
-    TestPureSineNoise_Windowed()
-    TestPureSineNoise_Hps()
-    
-    # Improved Tests for Real-world audio
-    TestRealWorldNoise_ZeroPad('./SampleAudio/A4_oboe.wav')
-    TestRealWorldNoise_Windowed('./SampleAudio/A4_oboe.wav')
-    TestRealWorldNoise_Hps('./SampleAudio/A4_oboe.wav')
-
-    # Improved Tests for Vocal audio
-    TestVocalNoise_ZeroPad('SampleAudio/Zauberflöte_vocal.wav')
-    TestVocalNoise_Windowed('SampleAudio/Zauberflöte_vocal.wav')
-    TestVocalNoise_Hps('SampleAudio/Zauberflöte_vocal.wav')
+    TestFrequencyStep_Subplots()
+    TestPureSineNoise_Subplots()
+    TestRealWorld_Subplots('./SampleAudio/A4_oboe.wav')
+    TestVocal_Subplots('SampleAudio/Zauberflöte_vocal.wav')
