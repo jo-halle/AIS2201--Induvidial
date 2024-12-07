@@ -46,7 +46,7 @@ def loadAndPrepareAudio(audioFile, targetFs=16000, duration=2.2, trueFrequency=4
     return audioData, signalPower, n, trueFrequency, targetFs
 
 ###############################################
-# Test 1: Frequency Step
+# Test 1: Frequency Step.
 ###############################################
 def TestFrequencyStep_Subplots():
     TimeN, XN, TrueFreqs = generateFreqStepSignal(Fs)
@@ -255,7 +255,7 @@ def TestPureSineNoise_Subplots():
     plt.show()
 
 ###############################################
-# Test 3: Real-world
+# Test 3: Real-world  Hello Jo S. Halle
 ###############################################
 def TestRealWorld_Subplots(AudioFile='./SampleAudio/A4_oboe.wav'):
     TargetFs = 16000
