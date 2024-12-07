@@ -5,57 +5,51 @@ from scipy.signal import resample_poly
 from baseline_algorithm import freq_detection
 from FreqDetection import freqDetectionZeroPad, FreqDetectionWindowed, FreqDetectionHps
 
-###############################################
-# Parameters
-###############################################
-Fs = 10_000   # Sampling frequency for synthetic tests
-NDFT = 1024   # Default DFT size
+Fs = 10_000
+NDFT = 1024
 
-###############################################
-# Helper Functions
-###############################################
-def generate_freq_step_signal(Fs, TTotal=2.0, F1=440, F2=880, Amplitude=1, NoiseVar=0.5):
-    NTotal = int(TTotal * Fs)
-    TimeN = np.arange(NTotal) / Fs
-    TimeChange = TTotal / 2
-    NChange = int(TimeChange * Fs)
+def generateFreqStepSignal(Fs, tTotal=2.0, f1=440, f2=880, amplitude=1, noiseVar=0.5):
+    nTotal = int(tTotal * Fs)
+    timeN = np.arange(nTotal) / Fs
+    timeChange = tTotal / 2
+    nChange = int(timeChange * Fs)
 
-    Signal = np.zeros(NTotal)
-    Signal[:NChange] = Amplitude * np.sin(2 * np.pi * F1 * TimeN[:NChange])
-    Signal[NChange:] = Amplitude * np.sin(2 * np.pi * F2 * TimeN[NChange:])
+    signal = np.zeros(nTotal)
+    signal[:nChange] = amplitude * np.sin(2 * np.pi * f1 * timeN[:nChange])
+    signal[nChange:] = amplitude * np.sin(2 * np.pi * f2 * timeN[nChange:])
     
-    Noise = np.random.normal(scale=np.sqrt(NoiseVar), size=NTotal)
-    XN = Signal + Noise
-    TrueFreqs = np.where(TimeN < TimeChange, F1, F2)
-    return TimeN, XN, TrueFreqs
+    noise = np.random.normal(scale=np.sqrt(noiseVar), size=nTotal)
+    xN = signal + noise
+    trueFreqs = np.where(timeN < timeChange, f1, f2)
+    return timeN, xN, trueFreqs
 
-def generate_pure_sine_noise(Fs, Duration=4.0, Frequency=885, Amplitude=1.0):
-    N = int(Duration * Fs)
-    TimeN = np.arange(N) / Fs
-    CleanSignal = Amplitude * np.sin(2 * np.pi * Frequency * TimeN)
-    return TimeN, CleanSignal, Frequency, Amplitude
+def generatePureSineNoise(Fs, duration=4.0, frequency=885, amplitude=1.0):
+    n = int(duration * Fs)
+    timeN = np.arange(n) / Fs
+    cleanSignal = amplitude * np.sin(2 * np.pi * frequency * timeN)
+    return timeN, cleanSignal, frequency, amplitude
 
-def load_and_prepare_audio(AudioFile, TargetFs=16000, Duration=2.2, TrueFrequency=440):
-    OrigFs, AudioData = wavfile.read(AudioFile)
-    AudioData = AudioData.astype(np.float32) / np.max(np.abs(AudioData))  # Normalize
-    N = int(Duration * TargetFs)
+def loadAndPrepareAudio(audioFile, targetFs=16000, duration=2.2, trueFrequency=440):
+    origFs, audioData = wavfile.read(audioFile)
+    audioData = audioData.astype(np.float32) / np.max(np.abs(audioData))
+    n = int(duration * targetFs)
 
-    if OrigFs != TargetFs:
-        AudioData = resample_poly(AudioData, TargetFs, OrigFs)
+    if origFs != targetFs:
+        audioData = resample_poly(audioData, targetFs, origFs)
 
-    if len(AudioData) < N:
-        AudioData = np.pad(AudioData, (0, N - len(AudioData)), 'constant')
+    if len(audioData) < n:
+        audioData = np.pad(audioData, (0, n - len(audioData)), 'constant')
     else:
-        AudioData = AudioData[:N]
+        audioData = audioData[:n]
 
-    SignalPower = np.mean(AudioData**2)
-    return AudioData, SignalPower, N, TrueFrequency, TargetFs
+    signalPower = np.mean(audioData**2)
+    return audioData, signalPower, n, trueFrequency, targetFs
 
 ###############################################
-# Test 1: Frequency Step - Separate Subplots
+# Test 1: Frequency Step
 ###############################################
 def TestFrequencyStep_Subplots():
-    TimeN, XN, TrueFreqs = generate_freq_step_signal(Fs)
+    TimeN, XN, TrueFreqs = generateFreqStepSignal(Fs)
 
     # Compute results
     T_b1024, F_b1024 = freq_detection(XN, Fs, N=1024)
@@ -124,14 +118,13 @@ def TestFrequencyStep_Subplots():
     plt.show()
 
 ###############################################
-# Test 2: Pure Sine with Noise - Separate Subplots for Each Method
+# Test 2: Pure Sine with Noise
 ###############################################
 def TestPureSineNoise_Subplots():
-    TimeN, CleanSignal, Frequency, Amplitude = generate_pure_sine_noise(Fs)
+    TimeN, CleanSignal, Frequency, Amplitude = generatePureSineNoise(Fs)
     SNRValues = np.logspace(-2, 2, 20)
     NoiseVars = (Amplitude**2 / (2 * SNRValues))
 
-    # Arrays for each method
     AvgEst_b, Err_b, Std_b = [], [], []
     AvgEst_zp, Err_zp, Std_zp = [], [], []
     AvgEst_w, Err_w, Std_w = [], [], []
@@ -175,7 +168,6 @@ def TestPureSineNoise_Subplots():
 
     InvSNR = 1 / SNRValues
 
-    # Create a figure with subplots: 2 rows (Freq, Error) x 4 cols (Baseline, ZP, W, HPS)
     fig, axs = plt.subplots(2, 4, figsize=(16, 10))
     fig.suptitle("Test 2: Pure Sine with Noise - All Methods in Separate Subplots")
 
@@ -263,15 +255,15 @@ def TestPureSineNoise_Subplots():
     plt.show()
 
 ###############################################
-# Test 3: Real-world - Separate Subplots
+# Test 3: Real-world
 ###############################################
 def TestRealWorld_Subplots(AudioFile='./SampleAudio/A4_oboe.wav'):
     TargetFs = 16000
     Duration = 2.2
     TrueFrequency = 440
 
-    AudioData, SignalPower, N, TrueFrequency, TargetFs = load_and_prepare_audio(AudioFile, TargetFs, Duration, TrueFrequency)
-    NoisePowers = np.logspace(-2, 3, 20)  # increased range if needed
+    AudioData, SignalPower, N, TrueFrequency, TargetFs = loadAndPrepareAudio(AudioFile, TargetFs, Duration, TrueFrequency)
+    NoisePowers = np.logspace(-2, 3, 20)
 
     AvgEst_b, Err_b, Var_b = [], [], []
     AvgEst_zp, Err_zp, Var_zp = [], [], []
@@ -409,10 +401,10 @@ def TestRealWorld_Subplots(AudioFile='./SampleAudio/A4_oboe.wav'):
     plt.show()
 
 ###############################################
-# Test 4: Vocal - Separate Subplots
+# Test 4: Vocal
 ###############################################
 def TestVocal_Subplots(AudioFile='SampleAudio/Zauberflöte_vocal.wav', TargetFs=16000, Duration=2.2, TrueFrequency=440, NDFT=2048):
-    AudioData, SignalPower, N, TrueFrequency, TargetFs = load_and_prepare_audio(AudioFile, TargetFs, Duration, TrueFrequency)
+    AudioData, SignalPower, N, TrueFrequency, TargetFs = loadAndPrepareAudio(AudioFile, TargetFs, Duration, TrueFrequency)
     NoisePowers = np.logspace(-2, 3, 20)
 
     AvgEst_b, Err_b, Var_b = [], [], []
@@ -551,7 +543,14 @@ def TestVocal_Subplots(AudioFile='SampleAudio/Zauberflöte_vocal.wav', TargetFs=
 # Run All Tests
 ###############################################
 if __name__ == "__main__":
+    # Test 1: Frequency Step
     TestFrequencyStep_Subplots()
+    
+    # Test 2: Pure Sine with Noise
     TestPureSineNoise_Subplots()
+    
+    # Test 3: Real-world
     TestRealWorld_Subplots('./SampleAudio/A4_oboe.wav')
+    
+    # Test 4: Vocal
     TestVocal_Subplots('SampleAudio/Zauberflöte_vocal.wav')
