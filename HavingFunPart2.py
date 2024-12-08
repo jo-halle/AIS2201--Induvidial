@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.io import wavfile
 from scipy.signal import resample_poly
 from baseline_algorithm import freq_detection
-from FreqDetection import freqDetectionZeroPad, FreqDetectionWindowed, FreqDetectionHps
+from FreqDetection import FreqDetectionZeroPad, FreqDetectionWindowed, FreqDetectionHps, CombinedFreqDetection
 
 Fs = 10_000
 NDFT = 1024
@@ -54,7 +54,7 @@ def TestFrequencyStep_Subplots():
     # Compute results
     T_b1024, F_b1024 = freq_detection(XN, Fs, N=1024)
     T_b2048, F_b2048 = freq_detection(XN, Fs, N=2048)
-    T_zp, F_zp = freqDetectionZeroPad(XN, Fs, N=1024, padFactor=4)
+    T_zp, F_zp = FreqDetectionZeroPad(XN, Fs, N=1024, padFactor=4)
     T_w, F_w = FreqDetectionWindowed(XN, Fs, N=1024)
     T_h, F_h = FreqDetectionHps(XN, Fs, N=1024, harmonics=3)
 
@@ -143,7 +143,7 @@ def TestPureSineNoise_Subplots():
         Std_b.append(np.std(eb))
 
         # Zero-Pad
-        _, Fz = freqDetectionZeroPad(XN, Fs, N=NDFT, padFactor=4)
+        _, Fz = FreqDetectionZeroPad(XN, Fs, N=NDFT, padFactor=4)
         Fz = np.array(Fz)
         ez = np.abs(Fz - Frequency)
         AvgEst_zp.append(np.mean(Fz))
@@ -283,7 +283,7 @@ def TestRealWorld_Subplots(AudioFile='./SampleAudio/A4_oboe.wav'):
         Var_b.append(np.var(Fb))
 
         # Zero-Pad
-        _, Fz = freqDetectionZeroPad(NoisySignal, TargetFs, N=2048, padFactor=4)
+        _, Fz = FreqDetectionZeroPad(NoisySignal, TargetFs, N=2048, padFactor=4)
         Fz = np.clip(Fz, 0, TargetFs/2)
         ez = np.abs(Fz - TrueFrequency)
         AvgEst_zp.append(np.mean(Fz))
@@ -425,7 +425,7 @@ def TestVocal_Subplots(AudioFile='SampleAudio/Zauberflöte_vocal.wav', TargetFs=
         Var_b.append(np.var(Fb))
 
         # Zero-Pad
-        _, Fz = freqDetectionZeroPad(NoisySignal, TargetFs, N=NDFT, padFactor=4)
+        _, Fz = FreqDetectionZeroPad(NoisySignal, TargetFs, N=NDFT, padFactor=4)
         Fz = np.clip(Fz, 0, TargetFs/2)
         ez = np.abs(Fz - TrueFrequency)
         AvgEst_zp.append(np.mean(Fz))
@@ -539,6 +539,42 @@ def TestVocal_Subplots(AudioFile='SampleAudio/Zauberflöte_vocal.wav', TargetFs=
     plt.tight_layout()
     plt.show()
 
+def TestCompositeAlgorithm():
+
+    TimeN, XN, TrueFreqs = generateFreqStepSignal(Fs)
+
+    # Compute results using the composite algorithm
+    T_combined, F_combined = CombinedFreqDetection(XN, Fs, N=1024, padFactor=4, harmonics=3)
+
+    # Compute results from individual methods (for comparison)
+    T_zp, F_zp = FreqDetectionZeroPad(XN, Fs, N=1024, padFactor=4)
+    T_w, F_w = FreqDetectionWindowed(XN, Fs, N=1024)
+    T_h, F_h = FreqDetectionHps(XN, Fs, N=1024, harmonics=3)
+
+    # Plot Results
+    plt.figure(figsize=(12, 8))
+    plt.title("Composite Algorithm: Combining Zero-Pad, Windowed, and HPS")
+
+    # True Frequency
+    plt.plot(TimeN, TrueFreqs, 'b', label="True Frequency")
+
+    # Individual Methods
+    plt.plot(T_zp, F_zp, 'orange', label="Zero-Pad")
+    plt.plot(T_w, F_w, 'purple', label="Windowed")
+    plt.plot(T_h, F_h, 'brown', label="HPS")
+
+    # Combined Algorithm
+    plt.plot(T_combined, F_combined, 'r', linewidth=2, label="Combined Algorithm")
+
+    # Formatting
+    plt.xlabel("Time (s)")
+    plt.ylabel("Frequency (Hz)")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
 ###############################################
 # Run All Tests
 ###############################################
@@ -554,3 +590,6 @@ if __name__ == "__main__":
     
     # Test 4: Vocal
     TestVocal_Subplots('SampleAudio/Zauberflöte_vocal.wav')
+
+    # Test 5: Composite Algorithm
+    TestCompositeAlgorithm()

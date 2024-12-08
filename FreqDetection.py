@@ -1,6 +1,6 @@
 import numpy as np
 
-def freqDetectionZeroPad(xN: np.ndarray, fs: int, N: int = 1024, padFactor: int = 4) -> (np.ndarray, np.ndarray):
+def FreqDetectionZeroPad(xN: np.ndarray, fs: int, N: int = 1024, padFactor: int = 4) -> (np.ndarray, np.ndarray):
     timeStamps = []
     freqs = []
     nPadded = N * padFactor
@@ -63,3 +63,20 @@ def FreqDetectionHps(xN: np.ndarray, fs: int, N: int = 1024, harmonics: int = 3)
         freqs.append(mPeak / N * fs)
         timeStamps.append((windowStart + N) / fs)
     return np.array(timeStamps), np.array(freqs)
+
+
+def CombinedFreqDetection(XN, Fs, N=1024, padFactor=4, harmonics=3):
+    # Step 1: Zero-Pad for enhanced frequency resolution
+    T_zp, F_zp = FreqDetectionZeroPad(XN, Fs, N=N, padFactor=padFactor)
+
+    # Step 2: Apply a Windowing function
+    T_w, F_w = FreqDetectionWindowed(XN, Fs, N=N)
+
+    # Step 3: Refine results with HPS
+    T_h, F_h = FreqDetectionHps(XN, Fs, N=N, harmonics=harmonics)
+
+    # Combine all results (use averaging for final estimate)
+    F_combined = (F_zp + F_w + F_h) / 3
+
+    # Return time values from any method (all have same length)
+    return T_zp, F_combined
