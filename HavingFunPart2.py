@@ -574,6 +574,191 @@ def TestCompositeAlgorithm():
     plt.tight_layout()
     plt.show()
 
+def TestCombinedFreqDetectionStep_Subplots():
+    TimeN, XN, TrueFreqs = generateFreqStepSignal(Fs)
+
+    # Compute results using the composite algorithm
+    T_combined, F_combined = CombinedFreqDetection(XN, Fs, N=1024, padFactor=4, harmonics=3)
+
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+    fig.suptitle("Test 1: Frequency Step - Combined Algorithm")
+
+    # True Frequency vs. Detected Frequency
+    axs[0].plot(TimeN, TrueFreqs, 'b', label='True Frequency')
+    axs[0].plot(T_combined, F_combined, 'r', label='Combined Algorithm')
+    axs[0].set_title("Frequency Estimate")
+    axs[0].set_xlabel("Time (s)")
+    axs[0].set_ylabel("Frequency (Hz)")
+    axs[0].grid(True)
+    axs[0].legend()
+
+    # Error
+    Error_combined = np.abs(F_combined - TrueFreqs[:len(F_combined)])
+    axs[1].plot(T_combined, Error_combined, 'r')
+    axs[1].set_title("Error")
+    axs[1].set_xlabel("Time (s)")
+    axs[1].set_ylabel("Error (Hz)")
+    axs[1].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def TestCombinedFreqDetectionSine_Subplots():
+    TimeN, CleanSignal, Frequency, Amplitude = generatePureSineNoise(Fs)
+    SNRValues = np.logspace(-2, 2, 20)
+    NoiseVars = (Amplitude**2 / (2 * SNRValues))
+
+    AvgEst_combined, Err_combined, Std_combined = [], [], []
+
+    for NoiseVar in NoiseVars:
+        Noise = np.random.normal(0, np.sqrt(NoiseVar), len(CleanSignal))
+        XN = CleanSignal + Noise
+
+        # Combined Algorithm
+        _, F_combined = CombinedFreqDetection(XN, Fs, N=NDFT, padFactor=4, harmonics=3)
+        F_combined = np.array(F_combined)
+        e_combined = np.abs(F_combined - Frequency)
+        AvgEst_combined.append(np.mean(F_combined))
+        Err_combined.append(np.mean(e_combined))
+        Std_combined.append(np.std(e_combined))
+
+    InvSNR = 1 / SNRValues
+
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+    fig.suptitle("Test 2: Pure Sine with Noise - Combined Algorithm")
+
+    # Frequency Estimate
+    axs[0].plot(InvSNR, AvgEst_combined, 'r', label='Combined Algorithm')
+    axs[0].fill_between(InvSNR, np.array(AvgEst_combined) - Std_combined, np.array(AvgEst_combined) + Std_combined, color='r', alpha=0.2)
+    axs[0].axhline(Frequency, color='black', linestyle='--', label=f"True Frequency = {Frequency} Hz")
+    axs[0].set_title("Frequency Estimate")
+    axs[0].set_xscale('log')
+    axs[0].set_xlabel("1/SNR")
+    axs[0].set_ylabel("Frequency (Hz)")
+    axs[0].grid(True)
+    axs[0].legend()
+
+    # Error
+    axs[1].plot(InvSNR, Err_combined, 'r')
+    axs[1].set_title("Error")
+    axs[1].set_xscale('log')
+    axs[1].set_yscale('log')
+    axs[1].set_xlabel("1/SNR")
+    axs[1].set_ylabel("Error (Hz)")
+    axs[1].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def TestCombinedFreqDetectionRealWorld(AudioFile='./SampleAudio/A4_oboe.wav'):
+    TargetFs = 16000
+    Duration = 2.2
+    TrueFrequency = 440
+
+    AudioData, SignalPower, N, TrueFrequency, TargetFs = loadAndPrepareAudio(AudioFile, TargetFs, Duration, TrueFrequency)
+    NoisePowers = np.logspace(-2, 3, 20)
+
+    AvgEst_combined, Err_combined, Var_combined = [], [], []
+
+    for NoisePower in NoisePowers:
+        Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
+        NoisySignal = AudioData + Noise
+
+        # Combined Algorithm
+        _, F_combined = CombinedFreqDetection(NoisySignal, TargetFs, N=2048, padFactor=4, harmonics=3)
+        F_combined = np.clip(F_combined, 0, TargetFs / 2)
+        e_combined = np.abs(F_combined - TrueFrequency)
+        AvgEst_combined.append(np.mean(F_combined))
+        Err_combined.append(np.mean(e_combined))
+        Var_combined.append(np.var(F_combined))
+
+    SNRValues = SignalPower / NoisePowers
+    InvSNRValues = 1 / SNRValues
+    Std_combined = np.sqrt(Var_combined)
+
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+    fig.suptitle(f"Test 3: Real-world Audio ({AudioFile}) - Combined Algorithm")
+
+    # Frequency Estimate
+    axs[0].plot(InvSNRValues, AvgEst_combined, 'r', label='Combined Algorithm')
+    axs[0].fill_between(InvSNRValues, np.array(AvgEst_combined) - Std_combined, np.array(AvgEst_combined) + Std_combined, color='r', alpha=0.2)
+    axs[0].axhline(TrueFrequency, color='black', linestyle='--', label=f"True Frequency = {TrueFrequency} Hz")
+    axs[0].set_title("Frequency Estimate")
+    axs[0].set_xscale('log')
+    axs[0].set_xlabel("1/SNR")
+    axs[0].set_ylabel("Frequency (Hz)")
+    axs[0].grid(True)
+    axs[0].legend()
+
+    # Error
+    axs[1].plot(InvSNRValues, Err_combined, 'r')
+    axs[1].set_title("Error")
+    axs[1].set_xscale('log')
+    axs[1].set_yscale('log')
+    axs[1].set_xlabel("1/SNR")
+    axs[1].set_ylabel("Error (Hz)")
+    axs[1].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+def TestCombinedFreqDetectionRealWorldVocal(AudioFile='SampleAudio/Zauberflöte_vocal.wav'):
+    TargetFs = 16000
+    Duration = 2.2
+    TrueFrequency = 440
+
+    # Load and prepare audio
+    AudioData, SignalPower, N, TrueFrequency, TargetFs = loadAndPrepareAudio(AudioFile, TargetFs, Duration, TrueFrequency)
+    NoisePowers = np.logspace(-2, 3, 20)
+
+    AvgEst_combined, Err_combined, Var_combined = [], [], []
+
+    for NoisePower in NoisePowers:
+        Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
+        NoisySignal = AudioData + Noise
+
+        # Combined Algorithm
+        _, F_combined = CombinedFreqDetection(NoisySignal, TargetFs, N=2048, padFactor=4, harmonics=3)
+        F_combined = np.clip(F_combined, 0, TargetFs / 2)
+        e_combined = np.abs(F_combined - TrueFrequency)
+        AvgEst_combined.append(np.mean(F_combined))
+        Err_combined.append(np.mean(e_combined))
+        Var_combined.append(np.var(F_combined))
+
+    SNRValues = SignalPower / NoisePowers
+    InvSNRValues = 1 / SNRValues
+    Std_combined = np.sqrt(Var_combined)
+
+    # Create the plots
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+    fig.suptitle(f"Test 4: Real-world Audio (Vocal) - Combined Algorithm")
+
+    # Frequency Estimate Plot
+    axs[0].plot(InvSNRValues, AvgEst_combined, 'r', label='Combined Algorithm')
+    axs[0].fill_between(InvSNRValues, np.array(AvgEst_combined) - Std_combined, np.array(AvgEst_combined) + Std_combined, color='r', alpha=0.2)
+    axs[0].axhline(TrueFrequency, color='black', linestyle='--', label=f"True Frequency = {TrueFrequency} Hz")
+    axs[0].set_title("Frequency Estimate")
+    axs[0].set_xscale('log')
+    axs[0].set_xlabel("1/SNR")
+    axs[0].set_ylabel("Frequency (Hz)")
+    axs[0].grid(True)
+    axs[0].legend()
+
+    # Error Plot
+    axs[1].plot(InvSNRValues, Err_combined, 'r')
+    axs[1].set_title("Error")
+    axs[1].set_xscale('log')
+    axs[1].set_yscale('log')
+    axs[1].set_xlabel("1/SNR")
+    axs[1].set_ylabel("Error (Hz)")
+    axs[1].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+
 
 ###############################################
 # Run All Tests
@@ -593,3 +778,17 @@ if __name__ == "__main__":
 
     # Test 5: Composite Algorithm
     TestCompositeAlgorithm()
+
+    # Test 6: Combined Algorithm - Frequency Step
+    TestCombinedFreqDetectionStep_Subplots()
+
+    # Test 7: Combined Algorithm - Pure Sine with Noise
+    TestCombinedFreqDetectionSine_Subplots()
+
+    # Test 8: Combined Algorithm - Real-world
+    TestCombinedFreqDetectionRealWorld('./SampleAudio/A4_oboe.wav')
+
+    # Test 9: Combined Algorithm - Vocal
+    TestCombinedFreqDetectionRealWorldVocal('SampleAudio/Zauberflöte_vocal.wav')
+
+    print("All tests completed successfully!")
