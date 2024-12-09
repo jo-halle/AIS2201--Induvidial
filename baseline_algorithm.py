@@ -1,3 +1,5 @@
+#Code taken from Excersise 7 in the course AIS2201 Signal Processing.
+
 import numpy as np
 def freq_detection(x_n: np.ndarray, fs: int, N: int = 1024)->float:
     """

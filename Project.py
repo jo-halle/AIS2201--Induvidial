@@ -543,30 +543,23 @@ def TestCompositeAlgorithm():
 
     TimeN, XN, TrueFreqs = generateFreqStepSignal(Fs)
 
-    # Compute results using the composite algorithm
     T_combined, F_combined = CombinedFreqDetection(XN, Fs, N=1024, padFactor=4, harmonics=3)
 
-    # Compute results from individual methods (for comparison)
     T_zp, F_zp = FreqDetectionZeroPad(XN, Fs, N=1024, padFactor=4)
     T_w, F_w = FreqDetectionWindowed(XN, Fs, N=1024)
     T_h, F_h = FreqDetectionHps(XN, Fs, N=1024, harmonics=3)
 
-    # Plot Results
     plt.figure(figsize=(12, 8))
     plt.title("Composite Algorithm: Combining Zero-Pad, Windowed, and HPS")
 
-    # True Frequency
     plt.plot(TimeN, TrueFreqs, 'b', label="True Frequency")
 
-    # Individual Methods
     plt.plot(T_zp, F_zp, 'orange', label="Zero-Pad")
     plt.plot(T_w, F_w, 'purple', label="Windowed")
     plt.plot(T_h, F_h, 'brown', label="HPS")
 
-    # Combined Algorithm
     plt.plot(T_combined, F_combined, 'r', linewidth=2, label="Combined Algorithm")
 
-    # Formatting
     plt.xlabel("Time (s)")
     plt.ylabel("Frequency (Hz)")
     plt.grid(True)
@@ -577,13 +570,11 @@ def TestCompositeAlgorithm():
 def TestCombinedFreqDetectionStep_Subplots():
     TimeN, XN, TrueFreqs = generateFreqStepSignal(Fs)
 
-    # Compute results using the composite algorithm
     T_combined, F_combined = CombinedFreqDetection(XN, Fs, N=1024, padFactor=4, harmonics=3)
 
     fig, axs = plt.subplots(1, 2, figsize=(12, 6))
     fig.suptitle("Test 1: Frequency Step - Combined Algorithm")
 
-    # True Frequency vs. Detected Frequency
     axs[0].plot(TimeN, TrueFreqs, 'b', label='True Frequency')
     axs[0].plot(T_combined, F_combined, 'r', label='Combined Algorithm')
     axs[0].set_title("Frequency Estimate")
@@ -592,7 +583,6 @@ def TestCombinedFreqDetectionStep_Subplots():
     axs[0].grid(True)
     axs[0].legend()
 
-    # Error
     Error_combined = np.abs(F_combined - TrueFreqs[:len(F_combined)])
     axs[1].plot(T_combined, Error_combined, 'r')
     axs[1].set_title("Error")
@@ -615,7 +605,6 @@ def TestCombinedFreqDetectionSine_Subplots():
         Noise = np.random.normal(0, np.sqrt(NoiseVar), len(CleanSignal))
         XN = CleanSignal + Noise
 
-        # Combined Algorithm
         _, F_combined = CombinedFreqDetection(XN, Fs, N=NDFT, padFactor=4, harmonics=3)
         F_combined = np.array(F_combined)
         e_combined = np.abs(F_combined - Frequency)
@@ -666,7 +655,6 @@ def TestCombinedFreqDetectionRealWorld(AudioFile='./SampleAudio/A4_oboe.wav'):
         Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
         NoisySignal = AudioData + Noise
 
-        # Combined Algorithm
         _, F_combined = CombinedFreqDetection(NoisySignal, TargetFs, N=2048, padFactor=4, harmonics=3)
         F_combined = np.clip(F_combined, 0, TargetFs / 2)
         e_combined = np.abs(F_combined - TrueFrequency)
@@ -709,7 +697,6 @@ def TestCombinedFreqDetectionRealWorldVocal(AudioFile='SampleAudio/Zauberflöte_
     Duration = 2.2
     TrueFrequency = 440
 
-    # Load and prepare audio
     AudioData, SignalPower, N, TrueFrequency, TargetFs = loadAndPrepareAudio(AudioFile, TargetFs, Duration, TrueFrequency)
     NoisePowers = np.logspace(-2, 3, 20)
 
@@ -719,7 +706,6 @@ def TestCombinedFreqDetectionRealWorldVocal(AudioFile='SampleAudio/Zauberflöte_
         Noise = np.random.normal(scale=np.sqrt(NoisePower), size=len(AudioData))
         NoisySignal = AudioData + Noise
 
-        # Combined Algorithm
         _, F_combined = CombinedFreqDetection(NoisySignal, TargetFs, N=2048, padFactor=4, harmonics=3)
         F_combined = np.clip(F_combined, 0, TargetFs / 2)
         e_combined = np.abs(F_combined - TrueFrequency)
